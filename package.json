@@ -1,0 +1,28 @@
+{
+  "name": "rednote-template-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "test": "node scripts/check-apple-template.mjs",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "deploy:pages": "npm run build && npx wrangler pages deploy dist"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "dom-to-image-more": "^3.7.1",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remark": "^15.0.1",
+    "remark-parse": "^11.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1"
+  }
+}

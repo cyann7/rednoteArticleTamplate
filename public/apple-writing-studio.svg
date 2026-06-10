@@ -1,0 +1,54 @@
+<svg width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="1000" rx="56" fill="#F5F5F7"/>
+  <rect x="152" y="156" width="1296" height="688" rx="42" fill="url(#surface)"/>
+  <ellipse cx="934" cy="745" rx="404" ry="58" fill="#D9DDE4" opacity="0.55"/>
+  <path d="M499 332C499 299.415 525.415 273 558 273H1044C1076.58 273 1103 299.415 1103 332V660H499V332Z" fill="#F8F9FB"/>
+  <path d="M530 340C530 322.327 544.327 308 562 308H1040C1057.67 308 1072 322.327 1072 340V631H530V340Z" fill="url(#screen)"/>
+  <rect x="572" y="353" width="458" height="22" rx="11" fill="#FFFFFF" opacity="0.78"/>
+  <rect x="572" y="407" width="328" height="14" rx="7" fill="#FFFFFF" opacity="0.52"/>
+  <rect x="572" y="439" width="402" height="14" rx="7" fill="#FFFFFF" opacity="0.46"/>
+  <rect x="572" y="471" width="260" height="14" rx="7" fill="#FFFFFF" opacity="0.42"/>
+  <rect x="865" y="528" width="162" height="48" rx="24" fill="#FFFFFF" opacity="0.62"/>
+  <path d="M420 660H1182L1256 740C1267.51 752.447 1258.69 773 1241.74 773H360.262C343.307 773 334.49 752.447 346.004 740L420 660Z" fill="url(#body)"/>
+  <path d="M676 679H926L945 716H657L676 679Z" fill="#C8CDD6" opacity="0.7"/>
+  <rect x="226" y="540" width="372" height="240" rx="34" fill="#FFFFFF"/>
+  <rect x="274" y="592" width="240" height="18" rx="9" fill="#1D1D1F"/>
+  <rect x="274" y="635" width="276" height="11" rx="5.5" fill="#86868B"/>
+  <rect x="274" y="663" width="218" height="11" rx="5.5" fill="#A1A1A6"/>
+  <rect x="274" y="707" width="136" height="13" rx="6.5" fill="#0071E3" opacity="0.82"/>
+  <path d="M1096 536C1114.22 519.263 1142.44 520.467 1159.17 538.689L1257.83 646.1C1274.56 664.322 1273.36 692.544 1255.14 709.281C1236.92 726.018 1208.7 724.814 1191.96 706.592L1093.31 599.181C1076.57 580.959 1077.78 552.737 1096 536Z" fill="url(#pen)"/>
+  <path d="M1254 646L1300 696C1310.15 707.046 1309.42 724.2 1298.38 734.349C1287.33 744.497 1270.18 743.77 1260.03 732.724L1214 682.743L1254 646Z" fill="#1D1D1F"/>
+  <circle cx="1198" cy="305" r="88" fill="url(#orbBlue)" opacity="0.78"/>
+  <circle cx="355" cy="323" r="66" fill="url(#orbWarm)" opacity="0.74"/>
+  <defs>
+    <linearGradient id="surface" x1="152" y1="156" x2="1448" y2="844" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#ECEEF2"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="530" y1="308" x2="1072" y2="631" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B9D9FF"/>
+      <stop offset="0.45" stop-color="#F7FAFF"/>
+      <stop offset="1" stop-color="#FCE8DD"/>
+    </linearGradient>
+    <linearGradient id="body" x1="346" y1="660" x2="1256" y2="773" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EFF1F5"/>
+      <stop offset="0.48" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D8DDE6"/>
+    </linearGradient>
+    <linearGradient id="pen" x1="1084" y1="527" x2="1268" y2="718" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.48" stop-color="#E7E9EF"/>
+      <stop offset="1" stop-color="#A7AFBC"/>
+    </linearGradient>
+    <radialGradient id="orbBlue" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1162 267) rotate(47.3373) scale(137.818)">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.38" stop-color="#A9D4FF"/>
+      <stop offset="1" stop-color="#0071E3"/>
+    </radialGradient>
+    <radialGradient id="orbWarm" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(329 295) rotate(47.4204) scale(104.668)">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#FFD0B0"/>
+      <stop offset="1" stop-color="#FF9500"/>
+    </radialGradient>
+  </defs>
+</svg>
