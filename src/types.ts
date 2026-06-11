@@ -15,6 +15,18 @@ export type PageNumberConfig = {
   style: PageNumberStyle;
 };
 
+export type ImageRatio = "auto" | "1:1" | "4:3" | "16:9" | "3:4";
+
+export type ImageSize = "full" | "wide" | "medium" | "small";
+
+export type ImageFit = "cover" | "contain";
+
+export type ImageOptions = {
+  ratio: ImageRatio;
+  size: ImageSize;
+  fit: ImageFit;
+};
+
 export type MarkdownBlockType = "heading" | "paragraph" | "list" | "quote" | "code" | "divider" | "image" | "spacer";
 
 export type MarkdownBlock = {
@@ -26,6 +38,7 @@ export type MarkdownBlock = {
   lang?: string;
   url?: string;
   alt?: string;
+  imageOptions?: ImageOptions;
   items?: string[];
   ordered?: boolean;
   startLine: number;

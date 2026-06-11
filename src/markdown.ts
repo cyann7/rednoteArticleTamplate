@@ -1,4 +1,4 @@
-import type { MarkdownBlock } from "./types";
+import type { ImageFit, ImageOptions, ImageRatio, ImageSize, MarkdownBlock } from "./types";
 
 const defaultText = `# 把想法写成作品：一套可持续的内容创作方法
 
@@ -119,6 +119,29 @@ export function getDefaultMarkdown() {
   return defaultText;
 }
 
+const imageRatios = new Set<ImageRatio>(["auto", "1:1", "4:3", "16:9", "3:4"]);
+const imageSizes = new Set<ImageSize>(["full", "wide", "medium", "small"]);
+const imageFits = new Set<ImageFit>(["cover", "contain"]);
+
+function parseImageOptions(raw?: string): ImageOptions {
+  const options: ImageOptions = {
+    ratio: "auto",
+    size: "full",
+    fit: "cover"
+  };
+
+  if (!raw) return options;
+
+  for (const part of raw.trim().split(/\s+/)) {
+    const [key, value] = part.split("=");
+    if (key === "ratio" && imageRatios.has(value as ImageRatio)) options.ratio = value as ImageRatio;
+    else if (key === "size" && imageSizes.has(value as ImageSize)) options.size = value as ImageSize;
+    else if (key === "fit" && imageFits.has(value as ImageFit)) options.fit = value as ImageFit;
+  }
+
+  return options;
+}
+
 export function parseMarkdown(source: string): MarkdownBlock[] {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const blocks: MarkdownBlock[] = [];
@@ -188,7 +211,7 @@ export function parseMarkdown(source: string): MarkdownBlock[] {
       continue;
     }
 
-    const image = line.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/);
+    const image = line.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)(?:\{([^}]*)\})?$/);
     if (image) {
       push({
         type: "image",
@@ -196,6 +219,7 @@ export function parseMarkdown(source: string): MarkdownBlock[] {
         raw: line,
         alt: image[1] || "图片",
         url: image[2],
+        imageOptions: parseImageOptions(image[3]),
         startLine: i,
         endLine: i
       });

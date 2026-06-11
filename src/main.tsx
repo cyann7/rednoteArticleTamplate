@@ -29,7 +29,7 @@ import {
 import domtoimage from "dom-to-image-more";
 import { getDefaultMarkdown, parseMarkdown } from "./markdown";
 import { templateList, templates } from "./templates";
-import type { MarkdownBlock, PageNumberConfig, RatioId, TemplateId } from "./types";
+import type { ImageFit, ImageOptions, ImageRatio, ImageSize, MarkdownBlock, PageNumberConfig, RatioId, TemplateId } from "./types";
 import "./styles.css";
 
 const ratioMap: Record<RatioId, { width: number; height: number }> = {
@@ -43,6 +43,9 @@ const textClipBuffer = 2;
 const markdownContentVersion = "v3";
 const localImageUrlPrefix = "rednote-image:";
 const localImageStoreKey = "rednote.images.v1";
+const imageRatioOptions: ImageRatio[] = ["auto", "1:1", "4:3", "16:9", "3:4"];
+const imageSizeOptions: ImageSize[] = ["full", "wide", "medium", "small"];
+const imageFitOptions: ImageFit[] = ["cover", "contain"];
 
 type FlowUnit = {
   id: string;
@@ -194,6 +197,27 @@ function sanitizeMarkdownImageAlt(text: string) {
     .replace(/[\r\n]+/g, " ")
     .replace(/[\[\]]/g, "")
     .trim() || "图片";
+}
+
+function normalizeImageOptions(options?: Partial<ImageOptions>): ImageOptions {
+  return {
+    ratio: options?.ratio ?? "auto",
+    size: options?.size ?? "full",
+    fit: options?.fit ?? "cover"
+  };
+}
+
+function formatImageOptions(options: ImageOptions) {
+  return `ratio=${options.ratio} size=${options.size} fit=${options.fit}`;
+}
+
+function setImageOptionsInRawImage(raw: string, options: ImageOptions) {
+  const normalized = normalizeImageOptions(options);
+  const nextOptions = `{${formatImageOptions(normalized)}}`;
+  if (/\{[^}]*\}\s*$/.test(raw)) {
+    return raw.replace(/\{[^}]*\}\s*$/, nextOptions);
+  }
+  return `${raw}${nextOptions}`;
 }
 
 function createLocalImageId() {
@@ -385,6 +409,21 @@ function App() {
     flashPreviewBlock(blockId);
   }
 
+  function updateImageOptions(blockId: string, patch: Partial<ImageOptions>) {
+    const block = blocks.find((item) => item.id === blockId);
+    if (!block || block.type !== "image") return;
+    const currentOptions = normalizeImageOptions(block.imageOptions);
+    const nextOptions = normalizeImageOptions({ ...currentOptions, ...patch });
+    const range = getBlockSourceRange(markdown, block);
+    const replacement = setImageOptionsInRawImage(block.raw, nextOptions);
+    pushUndoSnapshot(markdown);
+    setMarkdown(`${markdown.slice(0, range.start)}${replacement}${markdown.slice(range.end)}`);
+    setActiveBlockId(blockId);
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("rednote:layout-change"));
+    });
+  }
+
   function focusEditorBlock(blockId: string) {
     const textarea = markdownTextareaRef.current;
     const block = blocks.find((item) => item.id === blockId);
@@ -545,7 +584,7 @@ function App() {
     }
     const prefix = start > 0 && markdown[start - 1] !== "\n" ? "\n\n" : "";
     const suffix = end < markdown.length && markdown[end] !== "\n" ? "\n\n" : "\n";
-    const replacement = `${prefix}![${alt}](${localImageUrlPrefix}${imageId})${suffix}`;
+    const replacement = `${prefix}![${alt}](${localImageUrlPrefix}${imageId}){${formatImageOptions(normalizeImageOptions())}}${suffix}`;
     const nextCursor = start + replacement.length;
 
     replaceMarkdownSelection(
@@ -775,7 +814,7 @@ function App() {
                     } as React.CSSProperties}
                   >
                     <div className="preview-page-content">
-                      <RenderedPage units={page} activeBlockId={activeBlockId} onSelectBlock={handlePreviewBlockClick} />
+                      <RenderedPage units={page} activeBlockId={activeBlockId} onSelectBlock={handlePreviewBlockClick} onUpdateImageOptions={updateImageOptions} />
                     </div>
                     {pageNumber.enabled && !isFullRatio && (
                       <PageNumberOverlay config={pageNumber} pageIndex={pageIndex} totalPages={pages.length} />
@@ -1147,11 +1186,13 @@ function getPageUnitKey(unit: PageUnit) {
 function RenderedPage({
   units,
   activeBlockId,
-  onSelectBlock
+  onSelectBlock,
+  onUpdateImageOptions
 }: {
   units: PageUnit[];
   activeBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
+  onUpdateImageOptions?: (blockId: string, patch: Partial<ImageOptions>) => void;
 }) {
   const rendered = groupListUnits(units);
   return (
@@ -1159,7 +1200,7 @@ function RenderedPage({
       {rendered.map((item) => (
         item.kind === "listGroup"
           ? <RenderedListGroup key={item.units.map((unit) => unit.id).join("|")} units={item.units} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />
-          : <RenderedUnit key={item.unit.id} unit={item.unit} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />
+          : <RenderedUnit key={item.unit.id} unit={item.unit} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} onUpdateImageOptions={onUpdateImageOptions} />
       ))}
     </article>
   );
@@ -1188,16 +1229,18 @@ function groupListUnits(units: PageUnit[]) {
 function RenderedUnit({
   unit,
   activeBlockId,
-  onSelectBlock
+  onSelectBlock,
+  onUpdateImageOptions
 }: {
   unit: PageUnit;
   activeBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
+  onUpdateImageOptions?: (blockId: string, patch: Partial<ImageOptions>) => void;
 }) {
   const { block } = unit;
   if (block.type === "code" && block.lang === "html") return <HtmlBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
   if (block.type === "code") return <CodeBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
-  if (block.type === "image") return <ImageBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
+  if (block.type === "image") return <ImageBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} onUpdateImageOptions={onUpdateImageOptions} />;
   if (block.type === "divider") return <hr className={block.id === activeBlockId ? "section-divider is-sync-active" : "section-divider"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} />;
   if (block.type === "spacer") return <div className={block.id === activeBlockId ? "block block-spacer is-sync-active" : "block block-spacer"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} />;
 
@@ -1472,23 +1515,33 @@ function HtmlBlock({
 function ImageBlock({
   block,
   activeBlockId,
-  onSelectBlock
+  onSelectBlock,
+  onUpdateImageOptions
 }: {
   block: MarkdownBlock;
   activeBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
+  onUpdateImageOptions?: (blockId: string, patch: Partial<ImageOptions>) => void;
 }) {
   const [failed, setFailed] = useState(false);
   const imageUrl = resolveImageUrl(block.url);
+  const isActive = block.id === activeBlockId;
+  const imageOptions = normalizeImageOptions(block.imageOptions);
+  const imageClassName = [
+    "image-card",
+    `image-ratio-${imageOptions.ratio.replace(":", "-")}`,
+    `image-size-${imageOptions.size}`,
+    `image-fit-${imageOptions.fit}`
+  ].join(" ");
 
   return (
     <div
-      className={`block block-image ${block.id === activeBlockId ? "is-sync-active" : ""} ${onSelectBlock ? "is-sync-target" : ""}`}
+      className={`block block-image ${isActive ? "is-sync-active" : ""} ${onSelectBlock ? "is-sync-target" : ""}`}
       data-flow-unit-id={block.id}
       data-source-block-id={block.id}
       onClick={() => onSelectBlock?.(block.id)}
     >
-      <figure className="image-card">
+      <figure className={imageClassName}>
         {imageUrl && !failed ? (
           <img src={imageUrl} alt={block.alt || "图片"} onError={() => setFailed(true)} draggable={false} />
         ) : (
@@ -1499,6 +1552,78 @@ function ImageBlock({
         )}
         {block.alt && <figcaption>{block.alt}</figcaption>}
       </figure>
+      {isActive && onUpdateImageOptions && (
+        <ImageOptionsPanel
+          options={imageOptions}
+          onChange={(patch) => onUpdateImageOptions(block.id, patch)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ImageOptionsPanel({
+  options,
+  onChange
+}: {
+  options: ImageOptions;
+  onChange: (patch: Partial<ImageOptions>) => void;
+}) {
+  return (
+    <div className="image-options-panel" onClick={(event) => event.stopPropagation()}>
+      <SegmentedOption
+        label="比例"
+        options={imageRatioOptions}
+        value={options.ratio}
+        labels={{ auto: "原图", "1:1": "1:1", "4:3": "4:3", "16:9": "16:9", "3:4": "3:4" }}
+        onChange={(ratio) => onChange({ ratio })}
+      />
+      <SegmentedOption
+        label="尺寸"
+        options={imageSizeOptions}
+        value={options.size}
+        labels={{ full: "满", wide: "宽", medium: "中", small: "小" }}
+        onChange={(size) => onChange({ size })}
+      />
+      <SegmentedOption
+        label="填充"
+        options={imageFitOptions}
+        value={options.fit}
+        labels={{ cover: "裁切", contain: "完整" }}
+        onChange={(fit) => onChange({ fit })}
+      />
+    </div>
+  );
+}
+
+function SegmentedOption<T extends string>({
+  label,
+  options,
+  value,
+  labels,
+  onChange
+}: {
+  label: string;
+  options: T[];
+  value: T;
+  labels: Record<T, string>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="image-option-group">
+      <span>{label}</span>
+      <div className="image-option-buttons">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={option === value ? "is-active" : ""}
+            onClick={() => onChange(option)}
+          >
+            {labels[option]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
