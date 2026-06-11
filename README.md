@@ -17,6 +17,10 @@ npm run build
 
 The static output is generated in `dist/`.
 
+## Images
+
+Use the image button in the editor toolbar to choose a local image. The file is read in the browser and embedded into the Markdown as a data URL, so no backend upload service is required.
+
 ## Cloudflare Pages
 
 Use these settings when connecting the repository to Cloudflare Pages:

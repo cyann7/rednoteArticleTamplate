@@ -179,6 +179,13 @@ function wrapInlineText(text: string, format: InlineFormat) {
   return `${format.before}${text}${format.after}`;
 }
 
+function sanitizeMarkdownImageAlt(text: string) {
+  return text
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[\[\]]/g, "")
+    .trim() || "图片";
+}
+
 function App() {
   const [markdown, setMarkdown] = useState(loadInitialMarkdown);
   const [templateId, setTemplateId] = useState<TemplateId>(getSavedTemplateId);
@@ -193,6 +200,8 @@ function App() {
   const measureRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLElement>(null);
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pendingImageSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const [pageHeightPx, setPageHeightPx] = useState(0);
   const [pages, setPages] = useState<PageUnit[][]>([]);
   const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("rednote.fontScale") || 1));
@@ -208,7 +217,12 @@ function App() {
   const flowUnits = useMemo(() => makeFlowUnits(blocks), [blocks]);
 
   useEffect(() => {
-    localStorage.setItem("rednote.markdown", markdown);
+    try {
+      localStorage.setItem("rednote.markdown", markdown);
+      setError((current) => (current === "图片内容太大，浏览器本地存储空间不足。" ? null : current));
+    } catch {
+      setError("图片内容太大，浏览器本地存储空间不足。");
+    }
   }, [markdown]);
 
   useEffect(() => {
@@ -446,19 +460,55 @@ function App() {
     );
   }
 
-  function insertImage() {
+  function openImagePicker() {
     const textarea = markdownTextareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const alt = markdown.slice(start, end) || "图片说明";
-    const replacement = `![${alt}](/apple-writing-studio.svg)`;
-    const urlStart = start + alt.length + 4;
+    pendingImageSelectionRef.current = textarea
+      ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+      : null;
+    imageInputRef.current?.click();
+  }
+
+  function insertImageDataUrl(dataUrl: string, fileName: string) {
+    const selection = pendingImageSelectionRef.current;
+    const textarea = markdownTextareaRef.current;
+    const start = selection?.start ?? textarea?.selectionStart ?? markdown.length;
+    const end = selection?.end ?? textarea?.selectionEnd ?? start;
+    const selectedAlt = markdown.slice(start, end).trim();
+    const fallbackAlt = fileName.replace(/\.[^.]+$/, "").trim() || "图片";
+    const alt = sanitizeMarkdownImageAlt(selectedAlt || fallbackAlt);
+    const prefix = start > 0 && markdown[start - 1] !== "\n" ? "\n\n" : "";
+    const suffix = end < markdown.length && markdown[end] !== "\n" ? "\n\n" : "\n";
+    const replacement = `${prefix}![${alt}](${dataUrl})${suffix}`;
+    const nextCursor = start + replacement.length;
+
     replaceMarkdownSelection(
       `${markdown.slice(0, start)}${replacement}${markdown.slice(end)}`,
-      urlStart,
-      urlStart + "/apple-writing-studio.svg".length
+      nextCursor,
+      nextCursor
     );
+    pendingImageSelectionRef.current = null;
+  }
+
+  function handleImageFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("请选择图片文件。");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        setError("图片读取失败。");
+        return;
+      }
+      insertImageDataUrl(reader.result, file.name);
+    };
+    reader.onerror = () => setError("图片读取失败。");
+    reader.readAsDataURL(file);
   }
 
   function handleEditorKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -494,7 +544,7 @@ function App() {
     else if (isKey("8", "Digit8")) run(applyUnorderedList);
     else if (key === "c") run(applyCodeBlock);
     else if (isKey("-", "Minus")) run(insertDivider);
-    else if (key === "p") run(insertImage);
+    else if (key === "p") run(openImagePicker);
   }
 
   function undo() {
@@ -702,7 +752,16 @@ function App() {
             onUnorderedList={applyUnorderedList}
             onCodeBlock={applyCodeBlock}
             onDivider={insertDivider}
-            onImage={insertImage}
+            onImage={openImagePicker}
+          />
+          <input
+            ref={imageInputRef}
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            onChange={handleImageFileChange}
+            tabIndex={-1}
+            aria-hidden="true"
           />
           <textarea
             ref={markdownTextareaRef}
