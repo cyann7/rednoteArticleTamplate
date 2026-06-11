@@ -41,6 +41,8 @@ const ratioMap: Record<RatioId, { width: number; height: number }> = {
 
 const textClipBuffer = 2;
 const markdownContentVersion = "v3";
+const localImageUrlPrefix = "rednote-image:";
+const localImageStoreKey = "rednote.images.v1";
 
 type FlowUnit = {
   id: string;
@@ -70,6 +72,14 @@ type ExistingInlineFormat = {
   inner: string;
 };
 
+type LocalImageRecord = {
+  name: string;
+  dataUrl: string;
+  createdAt: number;
+};
+
+type LocalImageStore = Record<string, LocalImageRecord>;
+
 const exclusiveInlineFormats: InlineFormat[] = [
   { kind: "bold", before: "**", after: "**" },
   { kind: "highlight", before: "==", after: "==" },
@@ -89,7 +99,7 @@ function loadInitialMarkdown() {
     return getDefaultMarkdown();
   }
 
-  return savedMarkdown || getDefaultMarkdown();
+  return compactEmbeddedMarkdownImages(savedMarkdown || getDefaultMarkdown());
 }
 
 function getSavedTemplateId() {
@@ -184,6 +194,55 @@ function sanitizeMarkdownImageAlt(text: string) {
     .replace(/[\r\n]+/g, " ")
     .replace(/[\[\]]/g, "")
     .trim() || "图片";
+}
+
+function createLocalImageId() {
+  const random = Math.random().toString(36).slice(2, 9);
+  return `${Date.now().toString(36)}-${random}`;
+}
+
+function readLocalImageStore(): LocalImageStore {
+  try {
+    const raw = localStorage.getItem(localImageStoreKey);
+    return raw ? JSON.parse(raw) as LocalImageStore : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalImageStore(store: LocalImageStore) {
+  localStorage.setItem(localImageStoreKey, JSON.stringify(store));
+}
+
+function saveLocalImage(dataUrl: string, name: string) {
+  const id = createLocalImageId();
+  const store = readLocalImageStore();
+  store[id] = {
+    name,
+    dataUrl,
+    createdAt: Date.now()
+  };
+  writeLocalImageStore(store);
+  return id;
+}
+
+function resolveImageUrl(url?: string) {
+  if (!url?.startsWith(localImageUrlPrefix)) return url;
+  const id = url.slice(localImageUrlPrefix.length);
+  return readLocalImageStore()[id]?.dataUrl;
+}
+
+function compactEmbeddedMarkdownImages(markdown: string) {
+  if (!markdown.includes("](data:image/")) return markdown;
+
+  return markdown.replace(/!\[([^\]]*)\]\((data:image\/[^)\s]+)\)/g, (_match, alt: string, dataUrl: string) => {
+    try {
+      const id = saveLocalImage(dataUrl, sanitizeMarkdownImageAlt(alt));
+      return `![${sanitizeMarkdownImageAlt(alt)}](${localImageUrlPrefix}${id})`;
+    } catch {
+      return _match;
+    }
+  });
 }
 
 function App() {
@@ -476,9 +535,17 @@ function App() {
     const selectedAlt = markdown.slice(start, end).trim();
     const fallbackAlt = fileName.replace(/\.[^.]+$/, "").trim() || "图片";
     const alt = sanitizeMarkdownImageAlt(selectedAlt || fallbackAlt);
+    let imageId: string;
+    try {
+      imageId = saveLocalImage(dataUrl, alt);
+      setError((current) => (current === "图片内容太大，浏览器本地存储空间不足。" ? null : current));
+    } catch {
+      setError("图片内容太大，浏览器本地存储空间不足。");
+      return;
+    }
     const prefix = start > 0 && markdown[start - 1] !== "\n" ? "\n\n" : "";
     const suffix = end < markdown.length && markdown[end] !== "\n" ? "\n\n" : "\n";
-    const replacement = `${prefix}![${alt}](${dataUrl})${suffix}`;
+    const replacement = `${prefix}![${alt}](${localImageUrlPrefix}${imageId})${suffix}`;
     const nextCursor = start + replacement.length;
 
     replaceMarkdownSelection(
@@ -1412,6 +1479,7 @@ function ImageBlock({
   onSelectBlock?: (blockId: string) => void;
 }) {
   const [failed, setFailed] = useState(false);
+  const imageUrl = resolveImageUrl(block.url);
 
   return (
     <div
@@ -1421,8 +1489,8 @@ function ImageBlock({
       onClick={() => onSelectBlock?.(block.id)}
     >
       <figure className="image-card">
-        {block.url && !failed ? (
-          <img src={block.url} alt={block.alt || "图片"} onError={() => setFailed(true)} draggable={false} />
+        {imageUrl && !failed ? (
+          <img src={imageUrl} alt={block.alt || "图片"} onError={() => setFailed(true)} draggable={false} />
         ) : (
           <div className="image-placeholder">
             <Image size={22} />

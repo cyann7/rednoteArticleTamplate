@@ -19,7 +19,7 @@ The static output is generated in `dist/`.
 
 ## Images
 
-Use the image button in the editor toolbar to choose a local image. The file is read in the browser and embedded into the Markdown as a data URL, so no backend upload service is required.
+Use the image button in the editor toolbar to choose a local image. The file is stored in the browser and the Markdown keeps a short local reference such as `rednote-image:...`, so no backend upload service is required and the editor stays readable.
 
 ## Cloudflare Pages
 
