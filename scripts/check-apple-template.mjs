@@ -2,11 +2,29 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const styles = readFileSync(join(root, "src/styles.css"), "utf8");
-const templates = readFileSync(join(root, "src/templates.ts"), "utf8");
+const templatesIndex = readFileSync(join(root, "src/templates/index.ts"), "utf8");
+const appleTemplate = readFileSync(join(root, "src/templates/appleModern/index.ts"), "utf8");
+const appleContentTemplate = readFileSync(join(root, "src/templates/appleModern/contentTemplate.ts"), "utf8");
 const markdown = readFileSync(join(root, "src/markdown.ts"), "utf8");
 
 const failures = [];
+
+function loadCssBundle(relativePath, seen = new Set()) {
+  const absolutePath = join(root, relativePath);
+  if (seen.has(absolutePath)) {
+    return "";
+  }
+
+  seen.add(absolutePath);
+  const source = readFileSync(absolutePath, "utf8");
+
+  return source.replace(/@import\s+"([^"]+)";/g, (_, importPath) => {
+    const resolved = join(relativePath.slice(0, relativePath.lastIndexOf("/") + 1), importPath);
+    return loadCssBundle(resolved, seen);
+  });
+}
+
+const styles = loadCssBundle("src/styles.css");
 
 function expect(condition, message) {
   if (!condition) {
@@ -29,10 +47,11 @@ function cssBlock(selector) {
   return styles.slice(openBrace + 1, closeBrace);
 }
 
-expect(templates.includes('"apple-modern"'), "apple-modern template is missing");
-expect(!templates.includes('"template-apple"'), "legacy template-apple key should not return");
+expect(templatesIndex.includes("appleModernTemplate"), "apple-modern template registry entry is missing");
+expect(appleTemplate.includes('id: "apple-modern"'), "apple-modern template definition is missing");
+expect(!templatesIndex.includes('"template-apple"') && !appleTemplate.includes('"template-apple"'), "legacy template-apple key should not return");
 expect(styles.includes(".template-apple-modern"), "template-apple-modern CSS is missing");
-expect(!/[—–]/.test(styles + templates + markdown), "visible template copy must not use em or en dashes");
+expect(!/[—–]/.test(styles + templatesIndex + appleTemplate + appleContentTemplate + markdown), "visible template copy must not use em or en dashes");
 
 const pageBlock = cssBlock(".template-apple-modern,\n.preview-page-card.template-apple-modern");
 expect(pageBlock.includes("background: #ffffff;"), "Apple page canvas should use a bright white background");
@@ -55,7 +74,7 @@ expect(listBlock.includes("border-radius: 0;"), "Lists should not use rounded ca
 expect(listBlock.includes("box-shadow: none;"), "Lists should not use card shadows");
 expect(quoteBlock.includes("background: transparent;"), "Quotes should not use card backgrounds");
 expect(/border-radius:\s*2[468]px/.test(imageBlock), "Image cards should use Apple Store style rounded cards");
-expect(markdown.includes("![内容创作工作台](/apple-writing-studio.svg)"), "Default markdown should include the local Apple-style image");
+expect(appleContentTemplate.includes("![内容创作工作台](/apple-writing-studio.svg){size=large}"), "Apple template content template should include the local Apple-style image");
 
 if (failures.length > 0) {
   console.error("Apple template checks failed:");

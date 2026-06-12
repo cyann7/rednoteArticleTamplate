@@ -23,13 +23,15 @@ import {
   ListOrdered,
   Minus,
   Quote,
+  RotateCcw,
   Strikethrough,
   Underline,
 } from "lucide-react";
 import domtoimage from "dom-to-image-more";
-import { getDefaultMarkdown, parseMarkdown } from "./markdown";
-import { templateList, templates } from "./templates";
-import type { ImageFit, ImageOptions, ImageRatio, ImageSize, MarkdownBlock, PageNumberConfig, RatioId, TemplateId } from "./types";
+import { parseMarkdown } from "./markdown";
+import { getTemplateContentTemplate, templateList, templateSupportsBlock, templateSupportsHeadingLevel, templateSupportsInlineFormat, templates } from "./templates";
+import type { TemplateDefinition, TemplateRenderUnit } from "./templates";
+import type { HeadingLevel, ImageOptions, ImageSize, InlineFormatKind, MarkdownBlock, PageNumberConfig, RatioId, TemplateId } from "./types";
 import "./styles.css";
 
 const ratioMap: Record<RatioId, { width: number; height: number }> = {
@@ -43,9 +45,7 @@ const textClipBuffer = 2;
 const markdownContentVersion = "v3";
 const localImageUrlPrefix = "rednote-image:";
 const localImageStoreKey = "rednote.images.v1";
-const imageRatioOptions: ImageRatio[] = ["auto", "1:1", "4:3", "16:9", "3:4"];
-const imageSizeOptions: ImageSize[] = ["full", "wide", "medium", "small"];
-const imageFitOptions: ImageFit[] = ["cover", "contain"];
+const imageSizeOptions: ImageSize[] = ["small", "medium", "large"];
 
 type FlowUnit = {
   id: string;
@@ -60,16 +60,14 @@ type FlowUnit = {
 
 type PageUnit = FlowUnit;
 
-type InlineFormatKind = "bold" | "highlight" | "italic" | "strike" | "underline" | "code" | "link" | "custom";
-
 type InlineFormat = {
-  kind: InlineFormatKind;
+  kind: InlineFormatKind | "custom";
   before: string;
   after: string;
 };
 
 type ExistingInlineFormat = {
-  kind: InlineFormatKind;
+  kind: InlineFormatKind | "custom";
   rangeStart: number;
   rangeEnd: number;
   inner: string;
@@ -95,14 +93,15 @@ const exclusiveInlineFormats: InlineFormat[] = [
 function loadInitialMarkdown() {
   const savedVersion = localStorage.getItem("rednote.markdown.version");
   const savedMarkdown = localStorage.getItem("rednote.markdown");
+  const savedTemplateId = getSavedTemplateId();
 
   if (savedVersion !== markdownContentVersion) {
     if (savedMarkdown) localStorage.setItem("rednote.markdown.backup", savedMarkdown);
     localStorage.setItem("rednote.markdown.version", markdownContentVersion);
-    return getDefaultMarkdown();
+    return getTemplateContentTemplate(savedTemplateId);
   }
 
-  return compactEmbeddedMarkdownImages(savedMarkdown || getDefaultMarkdown());
+  return compactEmbeddedMarkdownImages(savedMarkdown || getTemplateContentTemplate(savedTemplateId));
 }
 
 function getSavedTemplateId() {
@@ -201,14 +200,12 @@ function sanitizeMarkdownImageAlt(text: string) {
 
 function normalizeImageOptions(options?: Partial<ImageOptions>): ImageOptions {
   return {
-    ratio: options?.ratio ?? "auto",
-    size: options?.size ?? "full",
-    fit: options?.fit ?? "cover"
+    size: options?.size ?? "medium"
   };
 }
 
 function formatImageOptions(options: ImageOptions) {
-  return `ratio=${options.ratio} size=${options.size} fit=${options.fit}`;
+  return `size=${options.size}`;
 }
 
 function setImageOptionsInRawImage(raw: string, options: ImageOptions) {
@@ -285,6 +282,8 @@ function App() {
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingImageSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  const preserveActiveBlockOnEditorFocusRef = useRef(false);
+  const previousTemplateIdRef = useRef<TemplateId>(getSavedTemplateId());
   const [pageHeightPx, setPageHeightPx] = useState(0);
   const [pages, setPages] = useState<PageUnit[][]>([]);
   const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("rednote.fontScale") || 1));
@@ -297,7 +296,15 @@ function App() {
   const isFullRatio = ratio === "full";
   const template = templates[templateId];
   const pageNumber = template.pageNumber;
+  const canUseHeading = (level: HeadingLevel) => templateSupportsHeadingLevel(template, level);
+  const canUseInline = (format: InlineFormatKind) => templateSupportsInlineFormat(template, format);
+  const canUseBlock = (blockType: MarkdownBlock["type"]) => templateSupportsBlock(template, blockType);
   const flowUnits = useMemo(() => makeFlowUnits(blocks), [blocks]);
+  const activeImageBlock = useMemo(() => {
+    const block = blocks.find((item) => item.id === activeBlockId);
+    return block?.type === "image" ? block : null;
+  }, [activeBlockId, blocks]);
+  const [floatingImageControls, setFloatingImageControls] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -315,6 +322,26 @@ function App() {
   useEffect(() => {
     localStorage.setItem("rednote.template.v2", templateId);
   }, [templateId]);
+
+  useEffect(() => {
+    const previousTemplateId = previousTemplateIdRef.current;
+    if (previousTemplateId === templateId) return;
+
+    const previousTemplateContent = getTemplateContentTemplate(previousTemplateId);
+    const nextTemplateContent = getTemplateContentTemplate(templateId);
+    previousTemplateIdRef.current = templateId;
+
+    if (!markdown.trim() || markdown === previousTemplateContent) {
+      setMarkdown(nextTemplateContent);
+      setUndoStack([]);
+      setRedoStack([]);
+      setActiveBlockId(null);
+      requestAnimationFrame(() => {
+        if (markdownTextareaRef.current) markdownTextareaRef.current.scrollTop = 0;
+        if (previewPaneRef.current) previewPaneRef.current.scrollTop = 0;
+      });
+    }
+  }, [markdown, templateId]);
 
   useEffect(() => {
     localStorage.setItem("rednote.fontScale", String(fontScale));
@@ -361,7 +388,7 @@ function App() {
         setPages((current) => (arePagesEqual(current, [flowUnits]) ? current : [flowUnits]));
         return;
       }
-      const next = paginateByProbe(flowUnits, measure, pageHeightPx, pagePadding, template.canvasClassName, fontScale);
+      const next = paginateByProbe(flowUnits, measure, pageHeightPx, pagePadding, template, fontScale);
       setPages((current) => (arePagesEqual(current, next) ? current : next));
     };
 
@@ -371,6 +398,58 @@ function App() {
       cancelAnimationFrame(frame);
     };
   }, [flowUnits, template.canvasClassName, fontScale, pageHeightPx, pagePadding, layoutRevision, isFullRatio]);
+
+  useLayoutEffect(() => {
+    const pane = previewPaneRef.current;
+    const frame = phoneFrameRef.current;
+    if (!pane || !frame || !activeImageBlock || busy === "export") {
+      setFloatingImageControls(null);
+      return;
+    }
+
+    const panelWidth = 178;
+
+    const updatePosition = () => {
+      const target = pane.querySelector<HTMLElement>(`[data-source-block-id="${activeImageBlock.id}"] .image-card`);
+      if (!target) {
+        setFloatingImageControls(null);
+        return;
+      }
+
+      const paneRect = pane.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const frameOffsetLeft = frameRect.left - paneRect.left;
+      const preferredRight = targetRect.right - frameRect.left + 12;
+      const preferredLeft = targetRect.left - frameRect.left - panelWidth - 12;
+      const maxLeft = pane.clientWidth - frameOffsetLeft - panelWidth - 16;
+      const fitsRight = frameOffsetLeft + preferredRight + panelWidth <= pane.clientWidth - 16;
+      const left = fitsRight
+        ? preferredRight
+        : preferredLeft >= 0
+          ? preferredLeft
+          : Math.max(0, Math.min(preferredRight, maxLeft));
+      const top = Math.max(0, targetRect.top - frameRect.top);
+
+      setFloatingImageControls({ top, left });
+    };
+
+    updatePosition();
+
+    const observer = new ResizeObserver(updatePosition);
+    observer.observe(frame);
+    observer.observe(pane);
+    pane.addEventListener("scroll", updatePosition, { passive: true });
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("rednote:layout-change", updatePosition);
+
+    return () => {
+      observer.disconnect();
+      pane.removeEventListener("scroll", updatePosition);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("rednote:layout-change", updatePosition);
+    };
+  }, [activeImageBlock, busy, fontScale, pagePadding, pages, templateId]);
 
   useEffect(() => {
     return () => {
@@ -405,8 +484,17 @@ function App() {
 
   function handlePreviewBlockClick(blockId: string) {
     setActiveBlockId(blockId);
+    preserveActiveBlockOnEditorFocusRef.current = true;
     focusEditorBlock(blockId);
     flashPreviewBlock(blockId);
+  }
+
+  function handleEditorFocus() {
+    if (preserveActiveBlockOnEditorFocusRef.current) {
+      preserveActiveBlockOnEditorFocusRef.current = false;
+      return;
+    }
+    setActiveBlockId(null);
   }
 
   function updateImageOptions(blockId: string, patch: Partial<ImageOptions>) {
@@ -510,7 +598,7 @@ function App() {
     replaceMarkdownSelection(next, lineStart, lineStart + formatted.length);
   }
 
-  function applyHeading(level: 1 | 2 | 3 | 4 | 5 | 6) {
+  function applyHeading(level: HeadingLevel) {
     applyLineFormat((line) => {
       const content = line.replace(/^#{1,6}\s+/, "").trim() || "标题";
       return `${"#".repeat(level)} ${content}`;
@@ -584,7 +672,7 @@ function App() {
     }
     const prefix = start > 0 && markdown[start - 1] !== "\n" ? "\n\n" : "";
     const suffix = end < markdown.length && markdown[end] !== "\n" ? "\n\n" : "\n";
-    const replacement = `${prefix}![${alt}](${localImageUrlPrefix}${imageId}){${formatImageOptions(normalizeImageOptions())}}${suffix}`;
+    const replacement = `${prefix}![${alt}](${localImageUrlPrefix}${imageId}){${formatImageOptions({ size: "medium" })}}${suffix}`;
     const nextCursor = start + replacement.length;
 
     replaceMarkdownSelection(
@@ -632,25 +720,25 @@ function App() {
     if (key === "z" && event.shiftKey) run(redo);
     else if (key === "z") run(undo);
     else if (!event.shiftKey) return;
-    else if (isKey("1", "Digit1")) run(() => applyHeading(1));
-    else if (isKey("2", "Digit2")) run(() => applyHeading(2));
-    else if (isKey("3", "Digit3")) run(() => applyHeading(3));
-    else if (isKey("4", "Digit4")) run(() => applyHeading(4));
-    else if (isKey("5", "Digit5")) run(() => applyHeading(5));
-    else if (isKey("6", "Digit6")) run(() => applyHeading(6));
-    else if (key === "b") run(() => applyInlineFormat("**", "**", "加粗内容"));
-    else if (key === "i") run(() => applyInlineFormat("*", "*", "斜体内容"));
-    else if (key === "u") run(() => applyInlineFormat("<u>", "</u>", "下划线内容"));
-    else if (key === "h") run(() => applyInlineFormat("==", "==", "高亮内容"));
-    else if (key === "x") run(() => applyInlineFormat("~~", "~~", "删除内容"));
-    else if (key === "e") run(() => applyInlineFormat("`", "`", "inlineCode"));
-    else if (key === "k") run(() => applyInlineFormat("[", "](https://example.com)", "链接文字"));
-    else if (isKey(".", "Period")) run(applyQuote);
-    else if (isKey("7", "Digit7")) run(applyOrderedList);
-    else if (isKey("8", "Digit8")) run(applyUnorderedList);
-    else if (key === "c") run(applyCodeBlock);
-    else if (isKey("-", "Minus")) run(insertDivider);
-    else if (key === "p") run(openImagePicker);
+    else if (isKey("1", "Digit1") && canUseHeading(1)) run(() => applyHeading(1));
+    else if (isKey("2", "Digit2") && canUseHeading(2)) run(() => applyHeading(2));
+    else if (isKey("3", "Digit3") && canUseHeading(3)) run(() => applyHeading(3));
+    else if (isKey("4", "Digit4") && canUseHeading(4)) run(() => applyHeading(4));
+    else if (isKey("5", "Digit5") && canUseHeading(5)) run(() => applyHeading(5));
+    else if (isKey("6", "Digit6") && canUseHeading(6)) run(() => applyHeading(6));
+    else if (key === "b" && canUseInline("bold")) run(() => applyInlineFormat("**", "**", "加粗内容"));
+    else if (key === "i" && canUseInline("italic")) run(() => applyInlineFormat("*", "*", "斜体内容"));
+    else if (key === "u" && canUseInline("underline")) run(() => applyInlineFormat("<u>", "</u>", "下划线内容"));
+    else if (key === "h" && canUseInline("highlight")) run(() => applyInlineFormat("==", "==", "高亮内容"));
+    else if (key === "x" && canUseInline("strike")) run(() => applyInlineFormat("~~", "~~", "删除内容"));
+    else if (key === "e" && canUseInline("code")) run(() => applyInlineFormat("`", "`", "inlineCode"));
+    else if (key === "k" && canUseInline("link")) run(() => applyInlineFormat("[", "](https://example.com)", "链接文字"));
+    else if (isKey(".", "Period") && canUseBlock("quote")) run(applyQuote);
+    else if (isKey("7", "Digit7") && canUseBlock("list")) run(applyOrderedList);
+    else if (isKey("8", "Digit8") && canUseBlock("list")) run(applyUnorderedList);
+    else if (key === "c" && canUseBlock("code")) run(applyCodeBlock);
+    else if (isKey("-", "Minus") && canUseBlock("divider")) run(insertDivider);
+    else if (key === "p" && canUseBlock("image")) run(openImagePicker);
   }
 
   function undo() {
@@ -667,6 +755,25 @@ function App() {
     setUndoStack((items) => [markdown, ...items].slice(0, 50));
     setMarkdown(next);
     setRedoStack(rest);
+  }
+
+  function resetToTemplateContent() {
+    const contentTemplate = getTemplateContentTemplate(template);
+    if (markdown === contentTemplate) return;
+    if (!window.confirm("将当前内容恢复为当前模板的默认内容模板？此操作可以撤销。")) return;
+
+    pushUndoSnapshot(markdown);
+    setMarkdown(contentTemplate);
+    setActiveBlockId(null);
+    setError(null);
+    pendingImageSelectionRef.current = null;
+
+    requestAnimationFrame(() => {
+      markdownTextareaRef.current?.focus();
+      markdownTextareaRef.current?.setSelectionRange(0, 0);
+      if (markdownTextareaRef.current) markdownTextareaRef.current.scrollTop = 0;
+      if (previewPaneRef.current) previewPaneRef.current.scrollTop = 0;
+    });
   }
 
   async function exportImages() {
@@ -741,6 +848,10 @@ function App() {
             <option value="1:1">1:1 · 1080×1080</option>
             <option value="full">全文长图 · 1080×自适应</option>
           </select>
+          <button type="button" onClick={resetToTemplateContent} title="恢复当前模板的默认内容模板">
+            <RotateCcw size={15} />
+            恢复模板内容
+          </button>
           <button type="button" className="primary" onClick={exportImages} disabled={busy === "export"} title="导出 ZIP">
             <Download size={16} />
             {busy === "export" ? "导出中" : "导出"}
@@ -813,8 +924,9 @@ function App() {
                       "--page-padding": `${pagePadding}px`
                     } as React.CSSProperties}
                   >
+                    {template.renderPageChrome?.({ pageIndex, totalPages: pages.length, isFullRatio })}
                     <div className="preview-page-content">
-                      <RenderedPage units={page} activeBlockId={activeBlockId} onSelectBlock={handlePreviewBlockClick} onUpdateImageOptions={updateImageOptions} />
+                      <RenderedPage template={template} units={page} activeBlockId={activeBlockId} onSelectBlock={handlePreviewBlockClick} />
                     </div>
                     {pageNumber.enabled && !isFullRatio && (
                       <PageNumberOverlay config={pageNumber} pageIndex={pageIndex} totalPages={pages.length} />
@@ -822,6 +934,17 @@ function App() {
                   </div>
                 ))}
               </div>
+              {activeImageBlock && floatingImageControls && busy !== "export" && (
+                <div
+                  className="preview-image-controls"
+                  style={{ top: floatingImageControls.top, left: floatingImageControls.left }}
+                >
+                  <ImageOptionsPanel
+                    options={normalizeImageOptions(activeImageBlock.imageOptions)}
+                    onChange={(patch) => updateImageOptions(activeImageBlock.id, patch)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -836,6 +959,7 @@ function App() {
 
         <section className="editor-pane">
           <MarkdownToolbar
+            template={template}
             undo={undo}
             redo={redo}
             canUndo={Boolean(undoStack.length)}
@@ -874,7 +998,7 @@ function App() {
             value={markdown}
             onChange={(event) => handleMarkdownChange(event.target.value)}
             onKeyDown={handleEditorKeyDown}
-            onFocus={() => setActiveBlockId(null)}
+            onFocus={handleEditorFocus}
             spellCheck={false}
           />
         </section>
@@ -960,20 +1084,20 @@ function paginateByProbe(
   probeRoot: HTMLElement,
   pageHeight: number,
   pagePadding: number,
-  canvasClassName: string,
+  template: TemplateDefinition,
   fontScale: number
 ): PageUnit[][] {
   if (!units.length) return [[]];
   if (!pageHeight) return [units];
 
-  const host = prepareProbeHost(probeRoot, pageHeight, pagePadding, canvasClassName, fontScale);
+  const host = prepareProbeHost(probeRoot, pageHeight, pagePadding, template.canvasClassName, fontScale);
   const root = createRoot(host);
   const pages: PageUnit[][] = [];
   let current: PageUnit[] = [];
   const queue = [...units];
 
   const renderFits = (candidate: PageUnit[]) => {
-    flushSync(() => root.render(<RenderedPage units={candidate} />));
+    flushSync(() => root.render(<RenderedPage template={template} units={candidate} />));
     return pageContentFits(host, pagePadding);
   };
 
@@ -1183,24 +1307,36 @@ function getPageUnitKey(unit: PageUnit) {
   return `${unit.id}:${unit.text}`;
 }
 
+function toTemplateRenderUnit(unit: PageUnit): TemplateRenderUnit {
+  return {
+    id: unit.id,
+    block: unit.block,
+    text: unit.text,
+    continuedFromPrevious: unit.continuedFromPrevious,
+    continuesOnNext: unit.continuesOnNext,
+    itemIndex: unit.itemIndex,
+    listContinuation: unit.listContinuation
+  };
+}
+
 function RenderedPage({
+  template,
   units,
   activeBlockId,
-  onSelectBlock,
-  onUpdateImageOptions
+  onSelectBlock
 }: {
+  template: TemplateDefinition;
   units: PageUnit[];
   activeBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
-  onUpdateImageOptions?: (blockId: string, patch: Partial<ImageOptions>) => void;
 }) {
   const rendered = groupListUnits(units);
   return (
     <article className="rendered-document">
       {rendered.map((item) => (
         item.kind === "listGroup"
-          ? <RenderedListGroup key={item.units.map((unit) => unit.id).join("|")} units={item.units} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />
-          : <RenderedUnit key={item.unit.id} unit={item.unit} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} onUpdateImageOptions={onUpdateImageOptions} />
+          ? <RenderedListGroup key={item.units.map((unit) => unit.id).join("|")} template={template} units={item.units} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />
+          : <RenderedUnit key={item.unit.id} template={template} unit={item.unit} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />
       ))}
     </article>
   );
@@ -1227,20 +1363,24 @@ function groupListUnits(units: PageUnit[]) {
 }
 
 function RenderedUnit({
+  template,
   unit,
   activeBlockId,
-  onSelectBlock,
-  onUpdateImageOptions
+  onSelectBlock
 }: {
+  template: TemplateDefinition;
   unit: PageUnit;
   activeBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
-  onUpdateImageOptions?: (blockId: string, patch: Partial<ImageOptions>) => void;
 }) {
   const { block } = unit;
+  if (block.type !== "list") {
+    const customRenderer = template.renderers?.unit?.[block.type];
+    if (customRenderer) return <>{customRenderer({ unit: toTemplateRenderUnit(unit), activeBlockId, onSelectBlock })}</>;
+  }
   if (block.type === "code" && block.lang === "html") return <HtmlBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
   if (block.type === "code") return <CodeBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
-  if (block.type === "image") return <ImageBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} onUpdateImageOptions={onUpdateImageOptions} />;
+  if (block.type === "image") return <ImageBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
   if (block.type === "divider") return <hr className={block.id === activeBlockId ? "section-divider is-sync-active" : "section-divider"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} />;
   if (block.type === "spacer") return <div className={block.id === activeBlockId ? "block block-spacer is-sync-active" : "block block-spacer"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} />;
 
@@ -1266,14 +1406,18 @@ function RenderedUnit({
 }
 
 function RenderedListGroup({
+  template,
   units,
   activeBlockId,
   onSelectBlock
 }: {
+  template: TemplateDefinition;
   units: PageUnit[];
   activeBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
 }) {
+  const customRenderer = template.renderers?.listGroup;
+  if (customRenderer) return <>{customRenderer({ units: units.map(toTemplateRenderUnit), activeBlockId, onSelectBlock })}</>;
   const block = units[0].block;
   const first = units[0];
   const last = units[units.length - 1];
@@ -1345,6 +1489,7 @@ function InlineText({ text }: { text: string }) {
 }
 
 function MarkdownToolbar({
+  template,
   undo,
   redo,
   canUndo,
@@ -1369,6 +1514,7 @@ function MarkdownToolbar({
   onDivider,
   onImage
 }: {
+  template: TemplateDefinition;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -1393,67 +1539,113 @@ function MarkdownToolbar({
   onDivider: () => void;
   onImage: () => void;
 }) {
+  const hasHeadingTools = [1, 2, 3, 4, 5, 6].some((level) => templateSupportsHeadingLevel(template, level as HeadingLevel));
+  const hasInlineTools = ["bold", "highlight", "italic", "strike", "underline", "code", "link"].some((format) => (
+    templateSupportsInlineFormat(template, format as InlineFormatKind)
+  ));
+  const hasBlockTools = ["quote", "list", "code", "divider", "image"].some((blockType) => (
+    templateSupportsBlock(template, blockType as MarkdownBlock["type"])
+  ));
+
   return (
     <div className="markdown-toolbar" aria-label="Markdown 格式工具栏">
-      <button type="button" onClick={onHeading1} title="一级标题 Cmd/Ctrl+Shift+1">
-        <Heading1 size={16} />
-      </button>
-      <button type="button" onClick={onHeading2} title="二级标题 Cmd/Ctrl+Shift+2">
-        <Heading2 size={16} />
-      </button>
-      <button type="button" onClick={onHeading3} title="三级标题 Cmd/Ctrl+Shift+3">
-        <Heading3 size={16} />
-      </button>
-      <button type="button" onClick={onHeading4} title="四级标题 Cmd/Ctrl+Shift+4">
-        <Heading4 size={16} />
-      </button>
-      <button type="button" onClick={onHeading5} title="五级标题 Cmd/Ctrl+Shift+5">
-        <Heading5 size={16} />
-      </button>
-      <button type="button" onClick={onHeading6} title="六级标题 Cmd/Ctrl+Shift+6">
-        <Heading6 size={16} />
-      </button>
-      <span className="toolbar-separator" />
-      <button type="button" onClick={onBold} title="加粗 Cmd/Ctrl+Shift+B">
-        <Bold size={16} />
-      </button>
-      <button type="button" onClick={onHighlight} title="高亮 Cmd/Ctrl+Shift+H">
-        <Highlighter size={16} />
-      </button>
-      <button type="button" onClick={onItalic} title="斜体 Cmd/Ctrl+Shift+I">
-        <Italic size={16} />
-      </button>
-      <button type="button" onClick={onStrike} title="删除线 Cmd/Ctrl+Shift+X">
-        <Strikethrough size={16} />
-      </button>
-      <button type="button" onClick={onUnderline} title="下划线 Cmd/Ctrl+Shift+U">
-        <Underline size={16} />
-      </button>
-      <button type="button" onClick={onInlineCode} title="行内代码 Cmd/Ctrl+Shift+E">
-        <Code2 size={16} />
-      </button>
-      <button type="button" onClick={onLink} title="链接 Cmd/Ctrl+Shift+K">
-        <Link size={16} />
-      </button>
-      <span className="toolbar-separator" />
-      <button type="button" onClick={onQuote} title="引用 Cmd/Ctrl+Shift+.">
-        <Quote size={16} />
-      </button>
-      <button type="button" onClick={onOrderedList} title="有编号列表 Cmd/Ctrl+Shift+7">
-        <ListOrdered size={16} />
-      </button>
-      <button type="button" onClick={onUnorderedList} title="无编号列表 Cmd/Ctrl+Shift+8">
-        <List size={16} />
-      </button>
-      <button type="button" onClick={onCodeBlock} title="代码块 Cmd/Ctrl+Shift+C">
-        <Code2 size={16} />
-      </button>
-      <button type="button" onClick={onDivider} title="分隔线 Cmd/Ctrl+Shift+-">
-        <Minus size={16} />
-      </button>
-      <button type="button" onClick={onImage} title="图片 Cmd/Ctrl+Shift+P">
-        <ImagePlus size={16} />
-      </button>
+      {templateSupportsHeadingLevel(template, 1) && (
+        <button type="button" onClick={onHeading1} title="一级标题 Cmd/Ctrl+Shift+1">
+          <Heading1 size={16} />
+        </button>
+      )}
+      {templateSupportsHeadingLevel(template, 2) && (
+        <button type="button" onClick={onHeading2} title="二级标题 Cmd/Ctrl+Shift+2">
+          <Heading2 size={16} />
+        </button>
+      )}
+      {templateSupportsHeadingLevel(template, 3) && (
+        <button type="button" onClick={onHeading3} title="三级标题 Cmd/Ctrl+Shift+3">
+          <Heading3 size={16} />
+        </button>
+      )}
+      {templateSupportsHeadingLevel(template, 4) && (
+        <button type="button" onClick={onHeading4} title="四级标题 Cmd/Ctrl+Shift+4">
+          <Heading4 size={16} />
+        </button>
+      )}
+      {templateSupportsHeadingLevel(template, 5) && (
+        <button type="button" onClick={onHeading5} title="五级标题 Cmd/Ctrl+Shift+5">
+          <Heading5 size={16} />
+        </button>
+      )}
+      {templateSupportsHeadingLevel(template, 6) && (
+        <button type="button" onClick={onHeading6} title="六级标题 Cmd/Ctrl+Shift+6">
+          <Heading6 size={16} />
+        </button>
+      )}
+      {hasHeadingTools && hasInlineTools && <span className="toolbar-separator" />}
+      {templateSupportsInlineFormat(template, "bold") && (
+        <button type="button" onClick={onBold} title="加粗 Cmd/Ctrl+Shift+B">
+          <Bold size={16} />
+        </button>
+      )}
+      {templateSupportsInlineFormat(template, "highlight") && (
+        <button type="button" onClick={onHighlight} title="高亮 Cmd/Ctrl+Shift+H">
+          <Highlighter size={16} />
+        </button>
+      )}
+      {templateSupportsInlineFormat(template, "italic") && (
+        <button type="button" onClick={onItalic} title="斜体 Cmd/Ctrl+Shift+I">
+          <Italic size={16} />
+        </button>
+      )}
+      {templateSupportsInlineFormat(template, "strike") && (
+        <button type="button" onClick={onStrike} title="删除线 Cmd/Ctrl+Shift+X">
+          <Strikethrough size={16} />
+        </button>
+      )}
+      {templateSupportsInlineFormat(template, "underline") && (
+        <button type="button" onClick={onUnderline} title="下划线 Cmd/Ctrl+Shift+U">
+          <Underline size={16} />
+        </button>
+      )}
+      {templateSupportsInlineFormat(template, "code") && (
+        <button type="button" onClick={onInlineCode} title="行内代码 Cmd/Ctrl+Shift+E">
+          <Code2 size={16} />
+        </button>
+      )}
+      {templateSupportsInlineFormat(template, "link") && (
+        <button type="button" onClick={onLink} title="链接 Cmd/Ctrl+Shift+K">
+          <Link size={16} />
+        </button>
+      )}
+      {hasInlineTools && hasBlockTools && <span className="toolbar-separator" />}
+      {templateSupportsBlock(template, "quote") && (
+        <button type="button" onClick={onQuote} title="引用 Cmd/Ctrl+Shift+.">
+          <Quote size={16} />
+        </button>
+      )}
+      {templateSupportsBlock(template, "list") && (
+        <button type="button" onClick={onOrderedList} title="有编号列表 Cmd/Ctrl+Shift+7">
+          <ListOrdered size={16} />
+        </button>
+      )}
+      {templateSupportsBlock(template, "list") && (
+        <button type="button" onClick={onUnorderedList} title="无编号列表 Cmd/Ctrl+Shift+8">
+          <List size={16} />
+        </button>
+      )}
+      {templateSupportsBlock(template, "code") && (
+        <button type="button" onClick={onCodeBlock} title="代码块 Cmd/Ctrl+Shift+C">
+          <Code2 size={16} />
+        </button>
+      )}
+      {templateSupportsBlock(template, "divider") && (
+        <button type="button" onClick={onDivider} title="分隔线 Cmd/Ctrl+Shift+-">
+          <Minus size={16} />
+        </button>
+      )}
+      {templateSupportsBlock(template, "image") && (
+        <button type="button" onClick={onImage} title="图片 Cmd/Ctrl+Shift+P">
+          <ImagePlus size={16} />
+        </button>
+      )}
       <span className="toolbar-spacer" />
       <div className="toolbar-history" aria-label="编辑历史">
         <button type="button" onClick={undo} disabled={!canUndo} title="撤销">
@@ -1515,13 +1707,11 @@ function HtmlBlock({
 function ImageBlock({
   block,
   activeBlockId,
-  onSelectBlock,
-  onUpdateImageOptions
+  onSelectBlock
 }: {
   block: MarkdownBlock;
   activeBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
-  onUpdateImageOptions?: (blockId: string, patch: Partial<ImageOptions>) => void;
 }) {
   const [failed, setFailed] = useState(false);
   const imageUrl = resolveImageUrl(block.url);
@@ -1529,14 +1719,19 @@ function ImageBlock({
   const imageOptions = normalizeImageOptions(block.imageOptions);
   const imageClassName = [
     "image-card",
-    `image-ratio-${imageOptions.ratio.replace(":", "-")}`,
-    `image-size-${imageOptions.size}`,
-    `image-fit-${imageOptions.fit}`
+    `image-size-${imageOptions.size}`
   ].join(" ");
+  const blockClassName = [
+    "block",
+    "block-image",
+    `image-block-size-${imageOptions.size}`,
+    isActive ? "is-sync-active" : "",
+    onSelectBlock ? "is-sync-target" : ""
+  ].filter(Boolean).join(" ");
 
   return (
     <div
-      className={`block block-image ${isActive ? "is-sync-active" : ""} ${onSelectBlock ? "is-sync-target" : ""}`}
+      className={blockClassName}
       data-flow-unit-id={block.id}
       data-source-block-id={block.id}
       onClick={() => onSelectBlock?.(block.id)}
@@ -1552,12 +1747,6 @@ function ImageBlock({
         )}
         {block.alt && <figcaption>{block.alt}</figcaption>}
       </figure>
-      {isActive && onUpdateImageOptions && (
-        <ImageOptionsPanel
-          options={imageOptions}
-          onChange={(patch) => onUpdateImageOptions(block.id, patch)}
-        />
-      )}
     </div>
   );
 }
@@ -1572,25 +1761,11 @@ function ImageOptionsPanel({
   return (
     <div className="image-options-panel" onClick={(event) => event.stopPropagation()}>
       <SegmentedOption
-        label="比例"
-        options={imageRatioOptions}
-        value={options.ratio}
-        labels={{ auto: "原图", "1:1": "1:1", "4:3": "4:3", "16:9": "16:9", "3:4": "3:4" }}
-        onChange={(ratio) => onChange({ ratio })}
-      />
-      <SegmentedOption
         label="尺寸"
         options={imageSizeOptions}
         value={options.size}
-        labels={{ full: "满", wide: "宽", medium: "中", small: "小" }}
+        labels={{ small: "小", medium: "中", large: "大" }}
         onChange={(size) => onChange({ size })}
-      />
-      <SegmentedOption
-        label="填充"
-        options={imageFitOptions}
-        value={options.fit}
-        labels={{ cover: "裁切", contain: "完整" }}
-        onChange={(fit) => onChange({ fit })}
       />
     </div>
   );

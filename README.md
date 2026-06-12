@@ -24,14 +24,12 @@ Use the image button in the editor toolbar to choose a local image. The file is 
 Image layout can be adjusted from the preview after selecting an image. The editor stores those choices as readable Markdown parameters:
 
 ```md
-![Cover](rednote-image:abc123){ratio=4:3 size=wide fit=cover}
+![Cover](rednote-image:abc123){size=medium}
 ```
 
 Supported values:
 
-- `ratio`: `auto`, `1:1`, `4:3`, `16:9`, `3:4`
-- `size`: `full`, `wide`, `medium`, `small`
-- `fit`: `cover`, `contain`
+- `size`: `small`, `medium`, `large`
 
 ## Cloudflare Pages
 

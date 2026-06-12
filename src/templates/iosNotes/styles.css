@@ -1,0 +1,471 @@
+.template-ios-notes,
+.preview-page-card.template-ios-notes {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  border-radius: 0;
+  background: #fff7d7;
+  color: #1c1c1e;
+  box-shadow: 0 14px 34px rgba(38, 34, 22, 0.12);
+}
+
+.preview-page-card.template-ios-notes::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 247, 215, 0.96) 0, rgba(255, 247, 215, 0.86) 84px, rgba(255, 247, 215, 0) 142px),
+    radial-gradient(circle at 88% 10%, rgba(255, 213, 89, 0.18), transparent 28%);
+}
+
+.template-ios-notes .preview-page-content {
+  z-index: 1;
+}
+
+.ios-notes-statusbar,
+.ios-notes-navbar,
+.ios-notes-home-indicator {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  user-select: none;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+.ios-notes-statusbar {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 28px 0;
+  color: #1c1c1e;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.ios-notes-indicators {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 14px;
+}
+
+.ios-notes-cellular {
+  width: 18px;
+  height: 11px;
+  background:
+    linear-gradient(to top, #1c1c1e 0 4px, transparent 4px) 0 7px / 3px 4px no-repeat,
+    linear-gradient(to top, #1c1c1e 0 6px, transparent 6px) 5px 5px / 3px 6px no-repeat,
+    linear-gradient(to top, #1c1c1e 0 8px, transparent 8px) 10px 3px / 3px 8px no-repeat,
+    linear-gradient(to top, #1c1c1e 0 11px, transparent 11px) 15px 0 / 3px 11px no-repeat;
+}
+
+.ios-notes-wifi {
+  width: 15px;
+  height: 11px;
+  border: 2px solid #1c1c1e;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-45deg) translateY(2px);
+}
+
+.ios-notes-battery {
+  position: relative;
+  width: 23px;
+  height: 11px;
+  border: 1.4px solid #1c1c1e;
+  border-radius: 3px;
+}
+
+.ios-notes-battery::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 5px;
+  border-radius: 1px;
+  background: #1c1c1e;
+}
+
+.ios-notes-battery::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: -3px;
+  width: 2px;
+  height: 5px;
+  border-radius: 0 2px 2px 0;
+  background: #1c1c1e;
+}
+
+.ios-notes-navbar {
+  top: 42px;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(119, 104, 62, 0.12);
+  color: #1c1c1e;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ios-notes-back,
+.ios-notes-done {
+  color: #c98f00;
+  font-weight: 500;
+}
+
+.ios-notes-back::before {
+  content: "‹";
+  margin-right: 4px;
+  font-size: 24px;
+  line-height: 0;
+  vertical-align: -2px;
+}
+
+.ios-notes-title {
+  color: rgba(28, 28, 30, 0.62);
+  font-size: 13px;
+  font-weight: 590;
+}
+
+.ios-notes-done {
+  justify-self: end;
+}
+
+.ios-notes-home-indicator {
+  left: 50%;
+  bottom: 8px;
+  width: 112px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.88);
+  transform: translateX(-50%);
+}
+
+.template-ios-notes .rendered-document {
+  position: relative;
+  z-index: 1;
+  padding: calc(var(--page-padding, 16px) + 106px) 24px calc(var(--page-padding, 16px) + 42px);
+  color: #1c1c1e;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-variant-numeric: proportional-nums;
+}
+
+.template-ios-notes .block {
+  margin: 0 0 13px;
+}
+
+.template-ios-notes .block-heading {
+  color: #1c1c1e;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.14;
+  text-wrap: balance;
+}
+
+.template-ios-notes .block-heading.heading-level-1 {
+  margin: 0 0 5px;
+  color: #1c1c1e;
+  font-size: calc(28px * var(--preview-font-scale, 1));
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.template-ios-notes .block-heading.heading-level-1 + .block-paragraph {
+  margin-top: 0;
+}
+
+.template-ios-notes .block-heading.heading-level-2 {
+  margin: 25px 0 9px;
+  padding: 0;
+  color: #1c1c1e;
+  font-size: calc(21px * var(--preview-font-scale, 1));
+  font-weight: 720;
+  line-height: 1.18;
+}
+
+.template-ios-notes .block-heading.heading-level-3 {
+  margin: 20px 0 7px;
+  color: #2c2c2e;
+  font-size: calc(18px * var(--preview-font-scale, 1));
+  font-weight: 690;
+  line-height: 1.24;
+}
+
+.template-ios-notes .block-heading.heading-level-4 {
+  margin: 17px 0 6px;
+  color: #3a3a3c;
+  font-size: calc(16px * var(--preview-font-scale, 1));
+  font-weight: 650;
+  line-height: 1.32;
+}
+
+.template-ios-notes .block-heading.heading-level-5,
+.template-ios-notes .block-heading.heading-level-6 {
+  margin: 15px 0 5px;
+  color: #636366;
+  font-size: calc(13px * var(--preview-font-scale, 1));
+  font-weight: 620;
+  line-height: 1.38;
+}
+
+.template-ios-notes .block-paragraph,
+.template-ios-notes .block-list,
+.template-ios-notes .block-quote {
+  font-size: calc(16.5px * var(--preview-font-scale, 1));
+  line-height: 1.48;
+}
+
+.template-ios-notes .block-paragraph {
+  color: #2c2c2e;
+  letter-spacing: 0;
+}
+
+.template-ios-notes .markdown-text {
+  padding: 1px 0;
+}
+
+.template-ios-notes .markdown-text strong {
+  color: #1c1c1e;
+  font-weight: 720;
+}
+
+.template-ios-notes .markdown-text mark {
+  padding: 0 3px 1px;
+  border-radius: 3px;
+  background: rgba(255, 204, 0, 0.46);
+  color: #1c1c1e;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.template-ios-notes .markdown-text em {
+  color: #555140;
+  font-style: italic;
+}
+
+.template-ios-notes .markdown-text s {
+  color: #8e8e93;
+  text-decoration-color: #8e8e93;
+  text-decoration-thickness: 1.2px;
+}
+
+.template-ios-notes .markdown-text u {
+  text-decoration-color: #c98f00;
+  text-decoration-style: solid;
+  text-decoration-thickness: 1.4px;
+  text-underline-offset: 4px;
+}
+
+.template-ios-notes .markdown-text code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(142, 142, 147, 0.16);
+  color: #1c1c1e;
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 0.84em;
+}
+
+.template-ios-notes .markdown-text a {
+  color: #b17400;
+  text-decoration-color: rgba(177, 116, 0, 0.38);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.template-ios-notes .block-list,
+.template-ios-notes .block-list.ordered-list {
+  margin: 10px 0 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #2c2c2e;
+}
+
+.template-ios-notes .list-row {
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: start;
+  min-height: 25px;
+  padding: 2px 0 4px;
+  border-bottom: 1px solid rgba(119, 104, 62, 0.11);
+}
+
+.template-ios-notes .list-row:last-child {
+  border-bottom: 0;
+}
+
+.template-ios-notes .list-marker,
+.template-ios-notes .block-list.ordered-list .list-marker {
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #8e8e93;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: 13px;
+  font-weight: 520;
+  line-height: 1.2;
+  justify-content: flex-start;
+}
+
+.template-ios-notes .list-row.unordered .list-marker::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin-left: 7px;
+  border-radius: 999px;
+  background: #8e8e93;
+}
+
+.template-ios-notes .block-quote {
+  margin: 18px 0 20px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.46);
+  color: #3a3a3c;
+  font-size: calc(15.5px * var(--preview-font-scale, 1));
+  line-height: 1.5;
+}
+
+.template-ios-notes .block-quote::before,
+.template-ios-notes .block-quote::after {
+  content: none;
+}
+
+.template-ios-notes .code-card {
+  margin: 16px 0 20px;
+  padding: 28px 14px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(28, 28, 30, 0.9);
+  color: #f2f2f7;
+  box-shadow: none;
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: calc(11px * var(--preview-font-scale, 1));
+  line-height: 1.62;
+}
+
+.template-ios-notes .code-language {
+  top: 9px;
+  right: 12px;
+  color: rgba(242, 242, 247, 0.58);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.template-ios-notes .infographic-card,
+.template-ios-notes .image-card {
+  margin: 17px 0 20px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: none;
+}
+
+.template-ios-notes .infographic-card {
+  padding: 14px;
+  color: #2c2c2e;
+}
+
+.template-ios-notes .infographic-card h1,
+.template-ios-notes .infographic-card h2,
+.template-ios-notes .infographic-card h3 {
+  margin: 0 0 8px;
+  color: #1c1c1e;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-weight: 700;
+}
+
+.template-ios-notes .infographic-card p,
+.template-ios-notes .infographic-card li {
+  color: #2c2c2e;
+  line-height: 1.48;
+}
+
+.template-ios-notes .image-card {
+  padding: 6px 6px 10px;
+  overflow: hidden;
+}
+
+.template-ios-notes .image-card img,
+.template-ios-notes .image-placeholder {
+  width: 100%;
+  max-height: 430px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #8e8e93;
+  filter: saturate(0.96) contrast(1.02);
+}
+
+.template-ios-notes .image-card figcaption {
+  margin: 8px 6px 0;
+  color: #8a7a4f;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: calc(11px * var(--preview-font-scale, 1));
+  line-height: 1.36;
+  text-align: left;
+}
+
+.template-ios-notes .section-divider {
+  height: 1px;
+  margin: 20px 0;
+  border: 0;
+  background: rgba(119, 104, 62, 0.16);
+}
+
+.template-ios-notes .block-spacer {
+  margin-bottom: 4px;
+}
+
+.template-ios-notes .block-spacer .markdown-text.spacer-line {
+  min-height: 4px;
+}
+
+.template-ios-notes .is-sync-active {
+  outline-color: rgba(201, 143, 0, 0.34);
+  background-color: rgba(255, 204, 0, 0.14);
+}
+
+.template-ios-notes .block-image.is-sync-active .image-card,
+.template-ios-notes .block-image.is-sync-highlight .image-card {
+  outline-color: rgba(201, 143, 0, 0.4);
+}
+
+.template-ios-notes .block.continues-on-next {
+  margin-bottom: 0;
+}
+
+.template-ios-notes .block.continued-from-previous {
+  margin-top: 0;
+}
+
+.template-ios-notes .block-list.continues-on-next,
+.template-ios-notes .block-quote.continues-on-next {
+  padding-bottom: 4px;
+}
+
+.template-ios-notes .block-list.continued-from-previous,
+.template-ios-notes .block-quote.continued-from-previous {
+  padding-top: 4px;
+}

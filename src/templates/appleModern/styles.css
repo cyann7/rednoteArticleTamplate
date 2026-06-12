@@ -1,0 +1,418 @@
+.template-apple-modern,
+.preview-page-card.template-apple-modern {
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  color: #1d1d1f;
+  box-shadow: 0 12px 28px rgba(29, 29, 31, 0.1);
+}
+
+.preview-page-card.template-apple-modern::before {
+  content: none;
+}
+
+.template-apple-modern .rendered-document {
+  padding: calc(var(--page-padding, 16px) + 20px) 0 calc(var(--page-padding, 16px) + 16px);
+  color: #1d1d1f;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-variant-numeric: proportional-nums;
+}
+
+.template-apple-modern .page-number-classic {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(29, 29, 31, 0.42);
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: calc(9.5px * var(--preview-font-scale, 1));
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: right;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.template-apple-modern .page-number-top-right {
+  top: 22px;
+  right: 28px;
+}
+
+.template-apple-modern .page-number-top-left {
+  top: 22px;
+  left: 28px;
+}
+
+.template-apple-modern .page-number-bottom-right {
+  right: 28px;
+  bottom: 22px;
+}
+
+.template-apple-modern .page-number-bottom-left {
+  left: 28px;
+  bottom: 22px;
+}
+
+.template-apple-modern .page-number-watermark {
+  color: rgba(29, 29, 31, 0.035);
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: calc(92px * var(--preview-font-scale, 1));
+  font-weight: 650;
+  letter-spacing: -0.06em;
+}
+
+.template-apple-modern .block {
+  margin: 0 38px 16px;
+}
+
+.template-apple-modern .block-heading {
+  color: #1d1d1f;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.08;
+}
+
+.template-apple-modern .block-heading.heading-level-1 {
+  margin: 14px 0 14px;
+  padding: 46px 38px 8px;
+  position: relative;
+  color: #1d1d1f;
+  text-align: left;
+  font-size: calc(39px * var(--preview-font-scale, 1));
+  font-weight: 760;
+  letter-spacing: -0.028em;
+  line-height: 1.04;
+}
+
+.template-apple-modern .block-heading.heading-level-1 .markdown-text {
+  max-width: 10.4em;
+  margin: 0;
+}
+
+.template-apple-modern .block-heading.heading-level-1::before {
+  content: none;
+}
+
+.template-apple-modern .block-heading.heading-level-1::after {
+  content: none;
+}
+
+.template-apple-modern .block-heading.heading-level-2 {
+  margin: 38px 38px 11px;
+  padding: 0;
+  color: #1d1d1f;
+  text-align: left;
+  font-size: calc(29px * var(--preview-font-scale, 1));
+  font-weight: 740;
+  letter-spacing: -0.024em;
+  line-height: 1.08;
+}
+
+.template-apple-modern .block-heading.heading-level-2 .markdown-text,
+.template-apple-modern .block-heading.heading-level-3 .markdown-text {
+  max-width: 13em;
+  margin: 0;
+}
+
+.template-apple-modern .block-heading.heading-level-3 {
+  margin: 28px 38px 10px;
+  color: #1d1d1f;
+  font-size: calc(24px * var(--preview-font-scale, 1));
+  font-weight: 720;
+  letter-spacing: -0.018em;
+  line-height: 1.12;
+  text-align: left;
+}
+
+.template-apple-modern .block-heading.heading-level-4 {
+  margin: 24px 38px 8px;
+  color: #1d1d1f;
+  font-size: calc(18px * var(--preview-font-scale, 1));
+  font-weight: 700;
+  letter-spacing: -0.006em;
+  line-height: 1.28;
+}
+
+.template-apple-modern .block-heading.heading-level-5,
+.template-apple-modern .block-heading.heading-level-6 {
+  margin: 18px 38px 7px;
+  color: #6e6e73;
+  font-size: calc(12px * var(--preview-font-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.45;
+}
+
+.template-apple-modern .block-paragraph,
+.template-apple-modern .block-list,
+.template-apple-modern .block-quote {
+  font-size: calc(16px * var(--preview-font-scale, 1));
+  line-height: 1.68;
+}
+
+.template-apple-modern .block-paragraph {
+  color: #424245;
+  letter-spacing: 0;
+}
+
+.template-apple-modern .block-heading.heading-level-1 + .block-paragraph {
+  margin: 0 38px 28px;
+  color: #6e6e73;
+  text-align: left;
+  font-size: calc(20px * var(--preview-font-scale, 1));
+  line-height: 1.32;
+}
+
+.template-apple-modern .block-heading.heading-level-2 + .block-paragraph,
+.template-apple-modern .block-heading.heading-level-3 + .block-paragraph {
+  color: #6e6e73;
+  text-align: left;
+  font-size: calc(18px * var(--preview-font-scale, 1));
+  line-height: 1.38;
+}
+
+.template-apple-modern .markdown-text strong {
+  color: #424245;
+  font-weight: 700;
+}
+
+.template-apple-modern .markdown-text mark {
+  padding: 0 4px 1px;
+  border-radius: 5px;
+  background: rgba(134, 134, 139, 0.16);
+  color: #1d1d1f;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.template-apple-modern .markdown-text em {
+  color: #6e6e73;
+  font-style: normal;
+}
+
+.template-apple-modern .markdown-text s {
+  color: #86868b;
+  text-decoration-color: #86868b;
+  text-decoration-thickness: 1.2px;
+}
+
+.template-apple-modern .markdown-text u {
+  text-decoration-color: #a1a1a6;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+.template-apple-modern .markdown-text code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #e8e8ed;
+  color: #1d1d1f;
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 0.84em;
+}
+
+.template-apple-modern .markdown-text a {
+  color: #06c;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.template-apple-modern .markdown-text a::after {
+  content: " >";
+  font-size: 0.9em;
+}
+
+.template-apple-modern .block-list,
+.template-apple-modern .block-list.ordered-list {
+  margin: 18px 38px 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #424245;
+  box-shadow: none;
+}
+
+.template-apple-modern .list-row {
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 9px;
+  align-items: start;
+  margin: 8px 0;
+}
+
+.template-apple-modern .list-marker,
+.template-apple-modern .block-list.ordered-list .list-marker {
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #86868b;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  justify-content: flex-start;
+}
+
+.template-apple-modern .list-row.unordered .list-marker::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  margin-left: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.template-apple-modern .block-quote {
+  margin: 30px 38px 34px;
+  padding: 22px 0 0;
+  border: 0;
+  border-top: 1px solid rgba(29, 29, 31, 0.12);
+  border-radius: 0;
+  background: transparent;
+  color: #1d1d1f;
+  text-align: left;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: calc(25px * var(--preview-font-scale, 1));
+  font-weight: 720;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+}
+
+.template-apple-modern .block-quote::before {
+  content: none;
+}
+
+.template-apple-modern .code-card {
+  margin: 24px 26px;
+  padding: 31px 22px 22px;
+  border: 0;
+  border-radius: 26px;
+  background: #1d1d1f;
+  color: #f5f5f7;
+  box-shadow: 0 12px 30px rgba(29, 29, 31, 0.14);
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: calc(11.5px * var(--preview-font-scale, 1));
+  line-height: 1.72;
+}
+
+.template-apple-modern .code-language {
+  top: 10px;
+  right: 14px;
+  color: #a1a1a6;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.template-apple-modern .infographic-card,
+.template-apple-modern .image-card {
+  margin: 24px 26px 30px;
+  border: 0;
+  border-radius: 28px;
+  background: #f5f5f7;
+  box-shadow: none;
+}
+
+.template-apple-modern .infographic-card {
+  padding: 24px;
+  color: #424245;
+}
+
+.template-apple-modern .infographic-card h1,
+.template-apple-modern .infographic-card h2,
+.template-apple-modern .infographic-card h3 {
+  margin: 0 0 10px;
+  color: #1d1d1f;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-weight: 720;
+  letter-spacing: -0.014em;
+}
+
+.template-apple-modern .infographic-card p,
+.template-apple-modern .infographic-card li {
+  color: #424245;
+  line-height: 1.68;
+}
+
+.template-apple-modern .infographic-card a {
+  color: #06c;
+  text-decoration: none;
+}
+
+.template-apple-modern .image-card {
+  padding: 8px 8px 13px;
+  min-height: 292px;
+  overflow: hidden;
+}
+
+.template-apple-modern .image-card img,
+.template-apple-modern .image-placeholder {
+  width: 100%;
+  max-height: none;
+  border-radius: 21px;
+  background: #ffffff;
+  color: #86868b;
+  filter: saturate(0.96) contrast(1.02);
+}
+
+.template-apple-modern .image-card figcaption {
+  margin: 11px 18px 0;
+  color: #6e6e73;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: calc(11px * var(--preview-font-scale, 1));
+  font-weight: 500;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.template-apple-modern .section-divider {
+  width: auto;
+  height: 1px;
+  margin: 38px 38px;
+  border: 0;
+  background: rgba(29, 29, 31, 0.1);
+}
+
+.template-apple-modern .block-spacer {
+  margin-bottom: 5px;
+}
+
+.template-apple-modern .block-spacer .markdown-text.spacer-line {
+  min-height: 5px;
+}
+
+.template-apple-modern .is-sync-active {
+  outline-color: rgba(0, 102, 204, 0.34);
+  background-color: rgba(0, 102, 204, 0.055);
+}
+
+.template-apple-modern .block-image.is-sync-active .image-card,
+.template-apple-modern .block-image.is-sync-highlight .image-card {
+  outline-color: rgba(0, 102, 204, 0.34);
+}
+
+.template-apple-modern .block.continues-on-next {
+  margin-bottom: 0;
+}
+
+.template-apple-modern .block.continued-from-previous {
+  margin-top: 0;
+}
+
+.template-apple-modern .block-list.continues-on-next,
+.template-apple-modern .block-quote.continues-on-next {
+  padding-bottom: 4px;
+}
+
+.template-apple-modern .block-list.continued-from-previous,
+.template-apple-modern .block-quote.continued-from-previous {
+  padding-top: 4px;
+}
+
