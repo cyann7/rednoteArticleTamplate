@@ -1,7 +1,7 @@
 import { defineTemplate, fullMarkdownSupport } from "../base";
 import { contentTemplate } from "./contentTemplate";
 
-export const appleModernTemplate = defineTemplate({
+export const template = defineTemplate({
   id: "apple-modern",
   order: 30,
   name: "极简风格",
@@ -16,3 +16,5 @@ export const appleModernTemplate = defineTemplate({
   },
   markdown: fullMarkdownSupport()
 });
+
+export const appleModernTemplate = template;

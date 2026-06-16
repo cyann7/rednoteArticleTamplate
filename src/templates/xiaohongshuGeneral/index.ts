@@ -1,7 +1,7 @@
 import { defineTemplate, fullMarkdownSupport } from "../base";
 import { contentTemplate } from "./contentTemplate";
 
-export const xiaohongshuGeneralTemplate = defineTemplate({
+export const template = defineTemplate({
   id: "xiaohongshu-general",
   order: 10,
   name: "小红书通用长文",
@@ -16,3 +16,5 @@ export const xiaohongshuGeneralTemplate = defineTemplate({
   },
   markdown: fullMarkdownSupport()
 });
+
+export const xiaohongshuGeneralTemplate = template;

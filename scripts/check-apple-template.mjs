@@ -47,7 +47,8 @@ function cssBlock(selector) {
   return styles.slice(openBrace + 1, closeBrace);
 }
 
-expect(templatesIndex.includes("appleModernTemplate"), "apple-modern template registry entry is missing");
+expect(templatesIndex.includes('import.meta.glob("./*/index.{ts,tsx}"'), "template discovery glob is missing");
+expect(templatesIndex.includes('import: "template"'), 'template discovery should load each module\'s "template" export');
 expect(appleTemplate.includes('id: "apple-modern"'), "apple-modern template definition is missing");
 expect(!templatesIndex.includes('"template-apple"') && !appleTemplate.includes('"template-apple"'), "legacy template-apple key should not return");
 expect(styles.includes(".template-apple-modern"), "template-apple-modern CSS is missing");

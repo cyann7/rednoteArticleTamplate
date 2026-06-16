@@ -1,18 +1,22 @@
 import type { HeadingLevel, InlineFormatKind, MarkdownBlockType, TemplateId } from "../types";
-import { appleModernTemplate } from "./appleModern";
-import { iosNotesTemplate } from "./iosNotes";
-import { proseNotesTemplate } from "./proseNotes";
-import { techShareLightTemplate } from "./techShareLight";
 import type { TemplateDefinition } from "./base";
-import { xiaohongshuGeneralTemplate } from "./xiaohongshuGeneral";
 
-const templateDefinitions = [
-  xiaohongshuGeneralTemplate,
-  techShareLightTemplate,
-  appleModernTemplate,
-  proseNotesTemplate,
-  iosNotesTemplate
-] as const satisfies readonly TemplateDefinition[];
+const templateDefinitions = Object.values(
+  import.meta.glob("./*/index.{ts,tsx}", {
+    eager: true,
+    import: "template"
+  })
+) as TemplateDefinition[];
+
+const seenTemplateIds = new Set<string>();
+
+for (const template of templateDefinitions) {
+  if (seenTemplateIds.has(template.id)) {
+    throw new Error(`Duplicate template id "${template.id}" detected.`);
+  }
+
+  seenTemplateIds.add(template.id);
+}
 
 export const templateList = [...templateDefinitions].sort((left, right) => left.order - right.order);
 

@@ -5,6 +5,7 @@ import {
   Bold,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Code2,
   Download,
   FileText,
@@ -31,7 +32,7 @@ import domtoimage from "dom-to-image-more";
 import { parseMarkdown } from "./markdown";
 import { getTemplateContentTemplate, templateList, templateSupportsBlock, templateSupportsHeadingLevel, templateSupportsInlineFormat, templates } from "./templates";
 import type { TemplateDefinition, TemplateRenderUnit } from "./templates";
-import type { HeadingLevel, ImageOptions, ImageSize, InlineFormatKind, MarkdownBlock, PageNumberConfig, RatioId, TemplateId } from "./types";
+import { DEFAULT_TEMPLATE_ID, type HeadingLevel, type ImageOptions, type ImageSize, type InlineFormatKind, type MarkdownBlock, type PageNumberConfig, type RatioId, type TemplateId } from "./types";
 import "./styles.css";
 
 const ratioMap: Record<RatioId, { width: number; height: number }> = {
@@ -42,10 +43,17 @@ const ratioMap: Record<RatioId, { width: number; height: number }> = {
 };
 
 const textClipBuffer = 2;
-const markdownContentVersion = "v3";
+const markdownContentVersion = "v4";
 const localImageUrlPrefix = "rednote-image:";
 const localImageStoreKey = "rednote.images.v1";
 const imageSizeOptions: ImageSize[] = ["small", "medium", "large"];
+const templateAccentMap: Record<TemplateId, string> = {
+  "apple-modern": "#4b5563",
+  "ios-notes": "#d39a1a",
+  "prose-notes": "#8b5e34",
+  "tech-share-light": "#6b7ff2",
+  "xiaohongshu-general": "#e85f73"
+};
 
 type FlowUnit = {
   id: string;
@@ -107,7 +115,7 @@ function loadInitialMarkdown() {
 function getSavedTemplateId() {
   const saved = localStorage.getItem("rednote.template.v2") as TemplateId | null;
 
-  return saved && templates[saved] ? saved : "apple-modern";
+  return saved && templates[saved] ? saved : DEFAULT_TEMPLATE_ID;
 }
 
 function getSavedRatio() {
@@ -279,6 +287,7 @@ function App() {
   const phoneFrameRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLElement>(null);
+  const templatePickerRef = useRef<HTMLDivElement>(null);
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingImageSelectionRef = useRef<{ start: number; end: number } | null>(null);
@@ -456,6 +465,20 @@ function App() {
       if (highlightTimerRef.current != null) window.clearTimeout(highlightTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isTemplatePickerOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const picker = templatePickerRef.current;
+      const target = event.target;
+      if (!picker || !(target instanceof Node) || picker.contains(target)) return;
+      setIsTemplatePickerOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isTemplatePickerOpen, templateId]);
 
   function pushUndoSnapshot(current: string) {
     setUndoStack((items) => [current, ...items].slice(0, 50));
@@ -852,44 +875,53 @@ function App() {
             <RotateCcw size={15} />
             恢复模板内容
           </button>
-          <button type="button" className="primary" onClick={exportImages} disabled={busy === "export"} title="导出 ZIP">
-            <Download size={16} />
-            {busy === "export" ? "导出中" : "导出"}
-          </button>
         </div>
       </header>
 
       <main className="workspace">
         <section className="preview-pane" ref={previewPaneRef}>
           <div className="preview-toolbar">
-            <div className="template-picker preview-template-picker">
-              <button type="button" onClick={() => setIsTemplatePickerOpen((open) => !open)}>
-                {template.name}
+            <div className="template-picker preview-template-picker" ref={templatePickerRef}>
+              <button
+                type="button"
+                className={isTemplatePickerOpen ? "is-open" : ""}
+                onClick={() => setIsTemplatePickerOpen((open) => !open)}
+                aria-haspopup="dialog"
+                aria-expanded={isTemplatePickerOpen}
+                title="选择模板"
+              >
+                <span className="template-picker-label">
+                  <strong>模板</strong>
+                </span>
+                <ChevronDown size={16} />
               </button>
               {isTemplatePickerOpen && (
-                <div className="template-menu">
-                  {templateList.map((item) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      className={item.id === templateId ? "is-active" : ""}
-                      onClick={() => {
-                        setTemplateId(item.id);
-                        setIsTemplatePickerOpen(false);
-                      }}
-                    >
-                      <span>{item.name}</span>
-                    </button>
-                  ))}
+                <div className="template-menu template-simple-menu" role="dialog" aria-label="选择模板">
+                  <div className="template-menu-list">
+                    {templateList.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={item.id === templateId ? "is-active" : ""}
+                        style={{ "--template-accent": templateAccentMap[item.id] || "#d39a1a" } as React.CSSProperties}
+                        onClick={() => {
+                          setTemplateId(item.id);
+                          setIsTemplatePickerOpen(false);
+                        }}
+                      >
+                        <span className="template-menu-accent" aria-hidden="true" />
+                        <span className="template-menu-copy">
+                          <strong>{item.name}</strong>
+                        </span>
+                        {item.id === templateId && <em>当前</em>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
             <PanelBar
               title="预览调整"
-              undo={undo}
-              redo={redo}
-              canUndo={Boolean(undoStack.length)}
-              canRedo={Boolean(redoStack.length)}
               fontScale={fontScale}
               pagePadding={pagePadding}
               onDecreaseFont={() => setFontScale((value) => Math.max(0.82, Number((value - 0.06).toFixed(2))))}
@@ -897,12 +929,18 @@ function App() {
               onDecreasePadding={() => setPagePadding((value) => Math.max(0, value - 4))}
               onIncreasePadding={() => setPagePadding((value) => Math.min(80, value + 4))}
             />
+            <button
+              type="button"
+              className="preview-export-button"
+              onClick={exportImages}
+              disabled={busy === "export"}
+              title="导出 ZIP"
+              aria-label={busy === "export" ? "导出中" : "导出"}
+            >
+              <Download size={16} />
+            </button>
           </div>
           <div className="phone-frame" ref={phoneFrameRef}>
-            <div className="phone-meta">
-              <span>{template.name}</span>
-              <span>{isFullRatio ? `${dimensions.width}×全文` : `${dimensions.width}×${dimensions.height}`}</span>
-            </div>
             <div
               ref={canvasRef}
               className={isFullRatio ? "phone-canvas phone-canvas-full" : "phone-canvas"}
@@ -1074,9 +1112,62 @@ function getBlockSourceRange(source: string, block: MarkdownBlock) {
 }
 
 function getTextareaScrollTopForOffset(textarea: HTMLTextAreaElement, source: string, offset: number) {
-  const line = source.slice(0, offset).split("\n").length - 1;
-  const lineHeight = Number.parseFloat(getComputedStyle(textarea).lineHeight) || 24;
-  return Math.max(0, line * lineHeight - textarea.clientHeight * 0.3);
+  const style = getComputedStyle(textarea);
+  const mirror = document.createElement("div");
+  const marker = document.createElement("span");
+  const mirrorStyleProps = [
+    "boxSizing",
+    "width",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "borderTopWidth",
+    "borderRightWidth",
+    "borderBottomWidth",
+    "borderLeftWidth",
+    "fontFamily",
+    "fontSize",
+    "fontStyle",
+    "fontWeight",
+    "fontVariant",
+    "fontStretch",
+    "lineHeight",
+    "letterSpacing",
+    "textTransform",
+    "textIndent",
+    "tabSize"
+  ] as const;
+
+  mirrorStyleProps.forEach((prop) => {
+    mirror.style[prop] = style[prop];
+  });
+
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.pointerEvents = "none";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.overflowWrap = "break-word";
+  mirror.style.wordBreak = "break-word";
+  mirror.style.top = "0";
+  mirror.style.left = "-9999px";
+  mirror.style.height = "auto";
+  mirror.style.minHeight = "0";
+  mirror.style.maxHeight = "none";
+  mirror.style.overflow = "hidden";
+
+  mirror.textContent = source.slice(0, offset);
+  marker.textContent = source[offset] || "\u200b";
+  mirror.append(marker);
+  document.body.append(mirror);
+
+  const markerTop = marker.offsetTop;
+  const markerHeight = marker.offsetHeight || Number.parseFloat(style.lineHeight) || 24;
+  mirror.remove();
+
+  const target = markerTop + markerHeight * 0.5 - textarea.clientHeight * 0.35;
+  const maxScrollTop = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
+  return Math.max(0, Math.min(target, maxScrollTop));
 }
 
 function paginateByProbe(
@@ -1331,8 +1422,30 @@ function RenderedPage({
   onSelectBlock?: (blockId: string) => void;
 }) {
   const rendered = groupListUnits(units);
+
+  function handlePageClickCapture(event: React.MouseEvent<HTMLElement>) {
+    if (!onSelectBlock) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const blockElement = target.closest<HTMLElement>("[data-source-block-id]");
+    if (!blockElement || !event.currentTarget.contains(blockElement)) return;
+
+    const blockId = blockElement.dataset.sourceBlockId;
+    if (!blockId) return;
+
+    // In preview mode, clicking inline links should still select the source block
+    // instead of navigating away and skipping editor sync.
+    if (target.closest("a")) {
+      event.preventDefault();
+    }
+
+    event.stopPropagation();
+    onSelectBlock(blockId);
+  }
+
   return (
-    <article className="rendered-document">
+    <article className="rendered-document" onClickCapture={handlePageClickCapture}>
       {rendered.map((item) => (
         item.kind === "listGroup"
           ? <RenderedListGroup key={item.units.map((unit) => unit.id).join("|")} template={template} units={item.units} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />
@@ -1805,10 +1918,6 @@ function SegmentedOption<T extends string>({
 
 function PanelBar({
   title,
-  undo,
-  redo,
-  canUndo,
-  canRedo,
   fontScale,
   pagePadding,
   onDecreaseFont,
@@ -1817,10 +1926,6 @@ function PanelBar({
   onIncreasePadding
 }: {
   title: string;
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
   fontScale?: number;
   pagePadding?: number;
   onDecreaseFont?: () => void;
@@ -1848,12 +1953,6 @@ function PanelBar({
             <button type="button" onClick={onIncreasePadding} title="增大页边距">+</button>
           </div>
         )}
-        <button type="button" className="panel-history-button" onClick={undo} disabled={!canUndo} title="撤销" aria-label="撤销">
-          <ChevronLeft size={16} />
-        </button>
-        <button type="button" className="panel-history-button" onClick={redo} disabled={!canRedo} title="重做" aria-label="重做">
-          <ChevronRight size={16} />
-        </button>
       </div>
     </div>
   );

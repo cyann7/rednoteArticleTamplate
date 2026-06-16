@@ -1,11 +1,11 @@
 import { defineTemplate, fullMarkdownSupport } from "../base";
 import { contentTemplate } from "./contentTemplate";
 
-export const iosNotesTemplate = defineTemplate({
+export const template = defineTemplate({
   id: "ios-notes",
   order: 50,
   name: "iOS 备忘录",
-  description: "模仿 iPhone 备忘录截图，浅黄纸面、系统导航栏与紧凑正文。",
+  description: "贴近原生截图的 iPhone 备忘录样式，白底正文、金色工具栏与纯文本笔记节奏。",
   contentTemplate,
   canvasClassName: "template-ios-notes",
   pageNumber: {
@@ -17,20 +17,35 @@ export const iosNotesTemplate = defineTemplate({
   markdown: fullMarkdownSupport(),
   renderPageChrome: () => (
     <>
-      <div className="ios-notes-statusbar" aria-hidden="true">
-        <span>9:41</span>
-        <span className="ios-notes-indicators">
-          <span className="ios-notes-cellular" />
-          <span className="ios-notes-wifi" />
-          <span className="ios-notes-battery" />
+      <div className="ios-notes-navbar" aria-hidden="true">
+        <span className="ios-notes-back">本地备忘录</span>
+        <span className="ios-notes-actions">
+          <span className="ios-notes-action">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9.1" />
+              <circle cx="8.2" cy="12" r="1" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+              <circle cx="15.8" cy="12" r="1" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
         </span>
       </div>
-      <div className="ios-notes-navbar" aria-hidden="true">
-        <span className="ios-notes-back">备忘录</span>
-        <span className="ios-notes-title">今天</span>
-        <span className="ios-notes-done">完成</span>
+      <div className="ios-notes-toolbar" aria-hidden="true">
+        <span className="ios-notes-tool">
+          <img className="ios-notes-tool-image" src="/ios-notes-icons/check-circle.svg" alt="" />
+        </span>
+        <span className="ios-notes-tool">
+          <img className="ios-notes-tool-image" src="/ios-notes-icons/camera.svg" alt="" />
+        </span>
+        <span className="ios-notes-tool">
+          <img className="ios-notes-tool-image" src="/ios-notes-icons/pen-nib-circle.svg" alt="" />
+        </span>
+        <span className="ios-notes-tool">
+          <img className="ios-notes-tool-image" src="/ios-notes-icons/edit-square.svg" alt="" />
+        </span>
       </div>
-      <div className="ios-notes-home-indicator" aria-hidden="true" />
     </>
   )
 });
+
+export const iosNotesTemplate = template;

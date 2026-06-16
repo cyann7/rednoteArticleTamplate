@@ -1,7 +1,7 @@
 import { defineTemplate, fullMarkdownSupport } from "../base";
 import { contentTemplate } from "./contentTemplate";
 
-export const techShareLightTemplate = defineTemplate({
+export const template = defineTemplate({
   id: "tech-share-light",
   order: 20,
   name: "柔和科技风",
@@ -16,3 +16,5 @@ export const techShareLightTemplate = defineTemplate({
   },
   markdown: fullMarkdownSupport()
 });
+
+export const techShareLightTemplate = template;

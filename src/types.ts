@@ -1,6 +1,6 @@
-export const TEMPLATE_IDS = ["xiaohongshu-general", "tech-share-light", "apple-modern", "prose-notes", "ios-notes"] as const;
+export const DEFAULT_TEMPLATE_ID = "apple-modern" as const;
 
-export type TemplateId = (typeof TEMPLATE_IDS)[number];
+export type TemplateId = string;
 
 export type RatioId = "9:16" | "3:4" | "1:1" | "full";
 

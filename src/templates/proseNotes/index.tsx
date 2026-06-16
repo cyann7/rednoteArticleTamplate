@@ -1,7 +1,7 @@
 import { defineTemplate, fullMarkdownSupport } from "../base";
 import { contentTemplate } from "./contentTemplate";
 
-export const proseNotesTemplate = defineTemplate({
+export const template = defineTemplate({
   id: "prose-notes",
   order: 40,
   name: "散文札记",
@@ -22,3 +22,5 @@ export const proseNotesTemplate = defineTemplate({
     </>
   )
 });
+
+export const proseNotesTemplate = template;
