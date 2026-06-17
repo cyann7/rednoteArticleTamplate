@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-16T15:19:23+08:00",
+  "title": "Design System: Rednote Markdown Studio",
+  "extensions": {
+    "colorMeta": {
+      "app-ink": {
+        "role": "primary",
+        "displayName": "Studio Ink",
+        "canonical": "#171717",
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(25% 0 0)", "oklch(35% 0 0)", "oklch(45% 0 0)", "oklch(60% 0 0)", "oklch(75% 0 0)", "oklch(88% 0 0)", "oklch(96% 0 0)"]
+      },
+      "template-red": {
+        "role": "primary",
+        "displayName": "Template Red",
+        "canonical": "#b9473b",
+        "tonalRamp": ["oklch(18% 0.06 30)", "oklch(28% 0.08 30)", "oklch(40% 0.12 30)", "oklch(52% 0.15 30)", "oklch(64% 0.14 30)", "oklch(76% 0.09 30)", "oklch(88% 0.04 30)", "oklch(96% 0.02 30)"]
+      },
+      "template-tech-blue": {
+        "role": "secondary",
+        "displayName": "Template Tech Blue",
+        "canonical": "#0071e3",
+        "tonalRamp": ["oklch(18% 0.08 255)", "oklch(28% 0.12 255)", "oklch(40% 0.16 255)", "oklch(52% 0.19 255)", "oklch(64% 0.16 255)", "oklch(76% 0.1 255)", "oklch(88% 0.05 255)", "oklch(96% 0.02 255)"]
+      },
+      "template-gold": {
+        "role": "secondary",
+        "displayName": "Template Gold",
+        "canonical": "#d39a1a",
+        "tonalRamp": ["oklch(20% 0.06 80)", "oklch(32% 0.09 80)", "oklch(44% 0.12 80)", "oklch(56% 0.14 80)", "oklch(68% 0.12 80)", "oklch(80% 0.08 80)", "oklch(90% 0.04 80)", "oklch(97% 0.02 80)"]
+      },
+      "preview-paper": {
+        "role": "neutral",
+        "displayName": "Preview Paper",
+        "canonical": "#fffaf0",
+        "tonalRamp": ["oklch(18% 0.02 78)", "oklch(30% 0.025 78)", "oklch(42% 0.025 78)", "oklch(56% 0.025 78)", "oklch(70% 0.02 78)", "oklch(84% 0.018 78)", "oklch(92% 0.014 78)", "oklch(98% 0.01 78)"]
+      }
+    },
+    "typographyMeta": {
+      "app-body": {
+        "displayName": "App Body",
+        "purpose": "Editor text, form controls, and general app chrome."
+      },
+      "app-label": {
+        "displayName": "App Label",
+        "purpose": "Template picker labels, compact panel text, and toolbar metadata."
+      },
+      "preview-heading": {
+        "displayName": "Preview Heading",
+        "purpose": "Fallback rendered Markdown headings when a template does not override them."
+      },
+      "preview-body": {
+        "displayName": "Preview Body",
+        "purpose": "Fallback rendered Markdown paragraphs and lists."
+      },
+      "mono": {
+        "displayName": "Code Mono",
+        "purpose": "Inline code and code cards."
+      }
+    },
+    "shadows": [
+      {
+        "name": "menu-lift",
+        "value": "0 12px 30px rgba(0, 0, 0, 0.12)",
+        "purpose": "Template menus and transient popovers."
+      },
+      {
+        "name": "warm-menu-lift",
+        "value": "0 18px 36px rgba(42, 33, 17, 0.12)",
+        "purpose": "Warm template picker menu elevation."
+      },
+      {
+        "name": "preview-page-lift",
+        "value": "0 18px 45px rgba(49, 43, 35, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.42)",
+        "purpose": "Fallback preview page card depth."
+      },
+      {
+        "name": "floating-control-lift",
+        "value": "0 12px 28px rgba(0, 0, 0, 0.14)",
+        "purpose": "Image controls that float over preview content."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-state",
+        "value": "background-color 160ms ease, border-color 160ms ease, transform 120ms ease, box-shadow 160ms ease",
+        "purpose": "Default button and select feedback."
+      },
+      {
+        "name": "sync-highlight",
+        "value": "background-color 180ms ease, outline-color 180ms ease",
+        "purpose": "Preview/editor block mapping feedback."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "desktop-lock",
+        "value": "1180px",
+        "purpose": "Desktop-to-mobile adaptation point. Below this, the app shifts from split-pane editing into Edit and Preview pages, with template choice and flat settings controls in the topbar."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Standard app control for secondary actions.",
+      "html": "<button class=\"ds-btn-default\">恢复模板内容</button>",
+      "css": ".ds-btn-default { height: 36px; padding: 0 12px; border: 1px solid #d8d8d8; border-radius: 8px; background: #ffffff; color: #171717; font: 500 14px/1 ui-sans-serif, system-ui, sans-serif; transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease, box-shadow 160ms ease; } .ds-btn-default:hover { border-color: #9d9d9d; background: #f7f7f7; } .ds-btn-default:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12); } .ds-btn-default:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "High-emphasis action using Studio Ink.",
+      "html": "<button class=\"ds-btn-primary\">导出图片</button>",
+      "css": ".ds-btn-primary { height: 36px; padding: 0 12px; border: 1px solid #171717; border-radius: 8px; background: #171717; color: #ffffff; font: 600 14px/1 ui-sans-serif, system-ui, sans-serif; transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease; } .ds-btn-primary:hover { background: #303030; border-color: #303030; } .ds-btn-primary:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.18); } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Toolbar Icon Button",
+      "kind": "button",
+      "refersTo": "toolbar-button",
+      "description": "Compact Markdown formatting action.",
+      "html": "<button class=\"ds-toolbar-btn\" aria-label=\"加粗\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 5h6a4 4 0 0 1 0 8H7z\"/><path d=\"M7 13h7a4 4 0 0 1 0 8H7z\"/></svg></button>",
+      "css": ".ds-toolbar-btn { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #d8d8d8; border-radius: 6px; background: #ffffff; color: #303030; transition: background-color 160ms ease, border-color 160ms ease; } .ds-toolbar-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; } .ds-toolbar-btn:hover { background: #f3f3f3; border-color: #9d9d9d; } .ds-toolbar-btn:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12); }"
+    },
+    {
+      "name": "Editor Field",
+      "kind": "input",
+      "refersTo": "editor-field",
+      "description": "Markdown drafting surface.",
+      "html": "<textarea class=\"ds-editor-field\" aria-label=\"Markdown 内容\"># 标题\\n\\n写下你的内容。</textarea>",
+      "css": ".ds-editor-field { width: 340px; min-height: 180px; resize: vertical; border: 1px solid #d8d8d8; border-radius: 8px; padding: 18px 19px; background: #ffffff; color: #202020; font: 400 15px/1.7 ui-sans-serif, system-ui, sans-serif; } .ds-editor-field:focus { outline: 0; border-color: #777777; box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12); } .ds-editor-field::placeholder { color: #6b6b6b; }"
+    },
+    {
+      "name": "Template Picker",
+      "kind": "nav",
+      "refersTo": "template-picker",
+      "description": "Compact selector that introduces template identity without turning the shell into a gallery.",
+      "html": "<button class=\"ds-template-picker\"><strong>模板</strong><span>⌄</span></button>",
+      "css": ".ds-template-picker { height: 42px; min-width: 92px; padding: 0 12px 0 13px; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #ddd7cc; border-radius: 12px; background: linear-gradient(180deg, #fffefb, #fbf8f2); color: #202020; font: 720 13px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 6px 18px rgba(55, 43, 20, 0.06); } .ds-template-picker:hover { border-color: #c7a86b; background: #fffdfa; } .ds-template-picker:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12); }"
+    },
+    {
+      "name": "Preview Page Card",
+      "kind": "card",
+      "refersTo": "preview-page",
+      "description": "Fallback exported page surface before a template overrides it.",
+      "html": "<article class=\"ds-preview-page\"><h1>内容标题</h1><p>预览页承载最终导出的视觉结果。</p></article>",
+      "css": ".ds-preview-page { width: 260px; min-height: 360px; padding: 32px 42px; border: 1px solid #cfc5b6; border-radius: 18px; background: #fffaf0; color: #241f1b; box-shadow: 0 18px 45px rgba(49, 43, 35, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.42); } .ds-preview-page h1 { margin: 0 0 18px; font: 850 28px/1.22 ui-sans-serif, system-ui, sans-serif; } .ds-preview-page p { margin: 0; font: 400 16px/1.72 ui-sans-serif, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Image Options Panel",
+      "kind": "custom",
+      "refersTo": "floating-image-controls",
+      "description": "Floating preview adjustment panel for selected images.",
+      "html": "<div class=\"ds-image-panel\"><span>尺寸</span><button>小</button><button class=\"is-active\">中</button><button>大</button></div>",
+      "css": ".ds-image-panel { width: 178px; padding: 10px; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(120, 120, 120, 0.22); border-radius: 8px; background: rgba(255, 255, 255, 0.72); color: #4f4f4f; font: 650 11px/1 -apple-system, BlinkMacSystemFont, SF Pro Text, PingFang SC, sans-serif; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14); } .ds-image-panel button { height: 24px; min-width: 32px; padding: 0 7px; border: 1px solid rgba(120, 120, 120, 0.24); border-radius: 6px; background: rgba(255, 255, 255, 0.78); color: #4a4a4a; } .ds-image-panel button.is-active { border-color: #252525; background: #252525; color: #ffffff; }"
+    },
+    {
+      "name": "Error Banner",
+      "kind": "custom",
+      "refersTo": "error-banner",
+      "description": "Bottom anchored error message for export or storage failures.",
+      "html": "<div class=\"ds-error-banner\" role=\"alert\">图片内容太大，浏览器本地存储空间不足。</div>",
+      "css": ".ds-error-banner { max-width: 520px; padding: 12px 14px; border: 1px solid #c94d40; border-radius: 8px; background: #fff1ed; color: #8f2f25; font: 500 14px/1.45 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 12px 30px rgba(45, 39, 31, 0.16); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Drafting Desk",
+    "overview": "Rednote Markdown Studio is a lightweight creation surface, not a design suite. The application chrome should stay quiet, familiar, and readable so the user can keep writing, checking the preview, and exporting without negotiating the interface. The system earns quality through precision: stable controls, clear states, enough spacing to breathe, and no ornament that competes with the post being authored.\n\nThe product has two visual layers. The app shell is restrained and mostly neutral: white surfaces, dark ink, thin borders, compact toolbars, and direct icon controls. The preview canvas is where personality lives: each template may use its own typography, paper treatment, image rhythm, and accent color as long as the exported result remains predictable.\n\nIt explicitly rejects complex design-software chrome, dense admin dashboards, flashy marketing-site treatment, and overly decorative template-gallery behavior.",
+    "keyCharacteristics": [
+      "Split-pane creation flow with preview and Markdown editor kept side by side on desktop.",
+      "Restrained app chrome using white surfaces, dark text, thin borders, and compact controls.",
+      "Template-specific visual systems scoped under their own canvas class.",
+      "Preview accuracy is treated as part of the interface, not a secondary output.",
+      "Preview pagination uses a fixed 500px logical canvas and viewport changes only scale the visual result.",
+      "Mobile uses Edit and Preview pages instead of shrinking the desktop split pane.",
+      "Mobile template choice is separate from Settings, and Settings uses a flat menu of direct controls.",
+      "Export opens a compact menu with image downloads and ZIP download.",
+      "Mobile export belongs to Preview as a floating round icon button.",
+      "State changes are fast and practical, with transitions around 120 to 180 ms."
+    ],
+    "rules": [
+      {
+        "name": "The Chrome Stays Neutral Rule",
+        "body": "The application shell uses dark ink, white surfaces, and thin borders by default. Template colors enter the shell only for template identity, selection, sync feedback, and export-specific context.",
+        "section": "colors"
+      },
+      {
+        "name": "The Accent Rarity Rule",
+        "body": "Saturated template colors should remain below 10 percent of the app shell. If the editor starts reading as red, blue, or gold, the content has lost priority.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tool Has No Hero Rule",
+        "body": "Product UI labels and panel titles stay compact. Large type belongs inside the generated post, not the surrounding app.",
+        "section": "typography"
+      },
+      {
+        "name": "The Template Owns Voice Rule",
+        "body": "A template may bring serif, paper, SF Pro, or code aesthetics, but those choices must stay scoped to the template class and never leak into the editor chrome.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-Until-Floating Rule",
+        "body": "Resting panels and editor controls are flat. Shadows are reserved for content that physically floats above the workspace or for template canvases that export with depth.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep the app shell neutral: app-bg, app-ink, app-border, and compact spacing are the default.",
+      "Do keep template personality inside the preview canvas and exported page.",
+      "Do use lucide icons for toolbar actions and give icon-only buttons accessible names.",
+      "Do keep controls stable in size so toolbar hover, disabled, and loading states do not shift layout.",
+      "Do verify that preview and export match before changing template chrome.",
+      "Do preserve the existing static-only architecture: local browser storage, no backend upload dependency."
+    ],
+    "donts": [
+      "Don't create complex design-software chrome.",
+      "Don't turn the app into a dense admin dashboard.",
+      "Don't use flashy marketing-site treatment in the working interface.",
+      "Don't make the template picker behave like an overly decorative gallery.",
+      "Don't use colored side-stripe borders greater than 1px on cards or callouts.",
+      "Don't add broad global template selectors. Template CSS must stay scoped to its template class.",
+      "Don't rely on desktop min-width as a responsive strategy. Narrow screens need structural adaptation."
+    ]
+  }
+}

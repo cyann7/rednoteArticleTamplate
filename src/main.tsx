@@ -25,6 +25,7 @@ import {
   Minus,
   Quote,
   RotateCcw,
+  SlidersHorizontal,
   Strikethrough,
   Underline,
 } from "lucide-react";
@@ -42,6 +43,8 @@ const ratioMap: Record<RatioId, { width: number; height: number }> = {
   full: { width: 1080, height: 0 }
 };
 
+const previewDesignWidthPx = 500;
+const previewPageGapPx = 14;
 const textClipBuffer = 2;
 const markdownContentVersion = "v4";
 const localImageUrlPrefix = "rednote-image:";
@@ -88,6 +91,8 @@ type LocalImageRecord = {
 };
 
 type LocalImageStore = Record<string, LocalImageRecord>;
+
+type MobileMode = "editor" | "preview";
 
 const exclusiveInlineFormats: InlineFormat[] = [
   { kind: "bold", before: "**", after: "**" },
@@ -283,18 +288,26 @@ function App() {
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mobileMode, setMobileMode] = useState<MobileMode>("editor");
+  const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const phoneFrameRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLElement>(null);
   const templatePickerRef = useRef<HTMLDivElement>(null);
+  const mobileTemplatePickerRef = useRef<HTMLDivElement>(null);
+  const mobileSettingsRef = useRef<HTMLDivElement>(null);
+  const desktopExportRef = useRef<HTMLDivElement>(null);
+  const mobileExportRef = useRef<HTMLDivElement>(null);
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingImageSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const preserveActiveBlockOnEditorFocusRef = useRef(false);
   const previousTemplateIdRef = useRef<TemplateId>(getSavedTemplateId());
-  const [pageHeightPx, setPageHeightPx] = useState(0);
   const [pages, setPages] = useState<PageUnit[][]>([]);
+  const [previewScale, setPreviewScale] = useState(1);
+  const [fullPreviewNaturalHeight, setFullPreviewNaturalHeight] = useState(0);
   const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("rednote.fontScale") || 1));
   const [pagePadding, setPagePadding] = useState(() => Number(localStorage.getItem("rednote.pagePadding") || 16));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
@@ -303,12 +316,17 @@ function App() {
   const blocks = useMemo(() => parseMarkdown(markdown), [markdown]);
   const dimensions = ratioMap[ratio];
   const isFullRatio = ratio === "full";
+  const pageHeightPx = isFullRatio ? 0 : previewDesignWidthPx * (dimensions.height / dimensions.width);
   const template = templates[templateId];
   const pageNumber = template.pageNumber;
   const canUseHeading = (level: HeadingLevel) => templateSupportsHeadingLevel(template, level);
   const canUseInline = (format: InlineFormatKind) => templateSupportsInlineFormat(template, format);
   const canUseBlock = (blockType: MarkdownBlock["type"]) => templateSupportsBlock(template, blockType);
   const flowUnits = useMemo(() => makeFlowUnits(blocks), [blocks]);
+  const previewNaturalHeight = isFullRatio
+    ? fullPreviewNaturalHeight
+    : pages.length * pageHeightPx + Math.max(0, pages.length - 1) * previewPageGapPx;
+  const previewFrameHeight = previewNaturalHeight > 0 ? previewNaturalHeight * previewScale : 0;
   const activeImageBlock = useMemo(() => {
     const block = blocks.find((item) => item.id === activeBlockId);
     return block?.type === "image" ? block : null;
@@ -372,21 +390,21 @@ function App() {
     const frame = phoneFrameRef.current;
     if (!frame) return;
 
-    const updatePagination = () => {
-      if (isFullRatio) {
-        setPageHeightPx(0);
-        return;
-      }
+    const updateScale = () => {
       const width = frame.getBoundingClientRect().width;
-      const nextPageHeight = width * (dimensions.height / dimensions.width);
-      setPageHeightPx(nextPageHeight);
+      const nextScale = Math.min(1, width / previewDesignWidthPx);
+      setPreviewScale((current) => (Math.abs(current - nextScale) < 0.001 ? current : nextScale));
     };
 
-    updatePagination();
-    const observer = new ResizeObserver(updatePagination);
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
     observer.observe(frame);
-    return () => observer.disconnect();
-  }, [dimensions.height, dimensions.width, isFullRatio]);
+    window.addEventListener("resize", updateScale);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateScale);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const measure = measureRef.current;
@@ -406,7 +424,25 @@ function App() {
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [flowUnits, template.canvasClassName, fontScale, pageHeightPx, pagePadding, layoutRevision, isFullRatio]);
+  }, [flowUnits, template.canvasClassName, fontScale, pageHeightPx, pagePadding, layoutRevision, isFullRatio, mobileMode]);
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const updateNaturalHeight = () => {
+      setFullPreviewNaturalHeight(canvas.scrollHeight);
+    };
+
+    updateNaturalHeight();
+    const frame = requestAnimationFrame(updateNaturalHeight);
+    const observer = new ResizeObserver(updateNaturalHeight);
+    observer.observe(canvas);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [pages, pageHeightPx, fontScale, pagePadding, templateId, layoutRevision]);
 
   useLayoutEffect(() => {
     const pane = previewPaneRef.current;
@@ -417,6 +453,7 @@ function App() {
     }
 
     const panelWidth = 178;
+    const visualPanelWidth = panelWidth * previewScale;
 
     const updatePosition = () => {
       const target = pane.querySelector<HTMLElement>(`[data-source-block-id="${activeImageBlock.id}"] .image-card`);
@@ -430,9 +467,9 @@ function App() {
       const targetRect = target.getBoundingClientRect();
       const frameOffsetLeft = frameRect.left - paneRect.left;
       const preferredRight = targetRect.right - frameRect.left + 12;
-      const preferredLeft = targetRect.left - frameRect.left - panelWidth - 12;
-      const maxLeft = pane.clientWidth - frameOffsetLeft - panelWidth - 16;
-      const fitsRight = frameOffsetLeft + preferredRight + panelWidth <= pane.clientWidth - 16;
+      const preferredLeft = targetRect.left - frameRect.left - visualPanelWidth - 12;
+      const maxLeft = pane.clientWidth - frameOffsetLeft - visualPanelWidth - 16;
+      const fitsRight = frameOffsetLeft + preferredRight + visualPanelWidth <= pane.clientWidth - 16;
       const left = fitsRight
         ? preferredRight
         : preferredLeft >= 0
@@ -440,7 +477,10 @@ function App() {
           : Math.max(0, Math.min(preferredRight, maxLeft));
       const top = Math.max(0, targetRect.top - frameRect.top);
 
-      setFloatingImageControls({ top, left });
+      setFloatingImageControls({
+        top: top / previewScale,
+        left: left / previewScale
+      });
     };
 
     updatePosition();
@@ -458,7 +498,7 @@ function App() {
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("rednote:layout-change", updatePosition);
     };
-  }, [activeImageBlock, busy, fontScale, pagePadding, pages, templateId]);
+  }, [activeImageBlock, busy, fontScale, pagePadding, pages, previewScale, templateId]);
 
   useEffect(() => {
     return () => {
@@ -471,14 +511,46 @@ function App() {
 
     const handlePointerDown = (event: PointerEvent) => {
       const picker = templatePickerRef.current;
+      const mobilePicker = mobileTemplatePickerRef.current;
       const target = event.target;
-      if (!picker || !(target instanceof Node) || picker.contains(target)) return;
+      if (!(target instanceof Node)) return;
+      if (picker?.contains(target) || mobilePicker?.contains(target)) return;
       setIsTemplatePickerOpen(false);
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [isTemplatePickerOpen, templateId]);
+
+  useEffect(() => {
+    if (!isMobileSettingsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const settings = mobileSettingsRef.current;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (settings?.contains(target)) return;
+      if (target instanceof Element && target.closest(".mobile-settings-button")) return;
+      setIsMobileSettingsOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isMobileSettingsOpen]);
+
+  useEffect(() => {
+    if (!isExportMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (desktopExportRef.current?.contains(target) || mobileExportRef.current?.contains(target)) return;
+      setIsExportMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isExportMenuOpen]);
 
   function pushUndoSnapshot(current: string) {
     setUndoStack((items) => [current, ...items].slice(0, 50));
@@ -510,6 +582,8 @@ function App() {
     preserveActiveBlockOnEditorFocusRef.current = true;
     focusEditorBlock(blockId);
     flashPreviewBlock(blockId);
+    setMobileMode("editor");
+    setIsMobileSettingsOpen(false);
   }
 
   function handleEditorFocus() {
@@ -799,55 +873,69 @@ function App() {
     });
   }
 
-  async function exportImages() {
-    if (!canvasRef.current) return;
+  async function renderExportFiles() {
+    if (!canvasRef.current) return [];
+    await document.fonts.ready;
+    const cards = Array.from(canvasRef.current.querySelectorAll<HTMLElement>(".preview-page-card"));
+    const files: ZipFile[] = [];
+    for (let page = 0; page < cards.length; page += 1) {
+      const card = cards[page];
+      const sourceWidth = card.offsetWidth || previewDesignWidthPx;
+      const sourceHeight = card.offsetHeight || pageHeightPx || card.scrollHeight;
+      const scale = dimensions.width / sourceWidth;
+      const exportHeight = isFullRatio ? Math.ceil(sourceHeight * scale) : dimensions.height;
+      const exportCornerRadii = getExportCornerRadii(card, scale);
+      const cardStyle = getComputedStyle(card);
+      card.classList.add("is-exporting");
+      let dataUrl: string;
+      try {
+        dataUrl = await domtoimage.toPng(card, {
+          width: dimensions.width,
+          height: exportHeight,
+          bgcolor: "transparent",
+          style: {
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+            width: `${sourceWidth}px`,
+            height: `${sourceHeight}px`,
+            background: cardStyle.background,
+            backgroundColor: cardStyle.backgroundColor,
+            backgroundImage: cardStyle.backgroundImage,
+            backgroundPosition: cardStyle.backgroundPosition,
+            backgroundRepeat: cardStyle.backgroundRepeat,
+            backgroundSize: cardStyle.backgroundSize,
+            borderColor: cardStyle.borderColor,
+            borderRadius: cardStyle.borderRadius,
+            borderStyle: cardStyle.borderStyle,
+            borderWidth: cardStyle.borderWidth,
+            overflow: "hidden",
+            boxShadow: "none"
+          }
+        });
+        dataUrl = await maskPngCorners(dataUrl, dimensions.width, exportHeight, exportCornerRadii);
+      } finally {
+        card.classList.remove("is-exporting");
+      }
+      files.push({
+        name: `rednote-page-${String(page + 1).padStart(2, "0")}.png`,
+        data: dataUrlToBytes(dataUrl)
+      });
+    }
+    return files;
+  }
+
+  async function exportImages(mode: "images" | "zip") {
     setBusy("export");
     setError(null);
+    setIsExportMenuOpen(false);
     try {
-      await document.fonts.ready;
-      const cards = Array.from(canvasRef.current.querySelectorAll<HTMLElement>(".preview-page-card"));
-      const files: ZipFile[] = [];
-      for (let page = 0; page < cards.length; page += 1) {
-        const card = cards[page];
-        const cardRect = card.getBoundingClientRect();
-        const scale = dimensions.width / cardRect.width;
-        const exportHeight = isFullRatio ? Math.ceil(cardRect.height * scale) : dimensions.height;
-        const exportCornerRadii = getExportCornerRadii(card, scale);
-        const cardStyle = getComputedStyle(card);
-        card.classList.add("is-exporting");
-        let dataUrl: string;
-        try {
-          dataUrl = await domtoimage.toPng(card, {
-            width: dimensions.width,
-            height: exportHeight,
-            bgcolor: "transparent",
-            style: {
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
-              width: `${cardRect.width}px`,
-              height: `${cardRect.height}px`,
-              background: cardStyle.background,
-              backgroundColor: cardStyle.backgroundColor,
-              backgroundImage: cardStyle.backgroundImage,
-              backgroundPosition: cardStyle.backgroundPosition,
-              backgroundRepeat: cardStyle.backgroundRepeat,
-              backgroundSize: cardStyle.backgroundSize,
-              borderColor: cardStyle.borderColor,
-              borderRadius: cardStyle.borderRadius,
-              borderStyle: cardStyle.borderStyle,
-              borderWidth: cardStyle.borderWidth,
-              overflow: "hidden",
-              boxShadow: "none"
-            }
-          });
-          dataUrl = await maskPngCorners(dataUrl, dimensions.width, exportHeight, exportCornerRadii);
-        } finally {
-          card.classList.remove("is-exporting");
+      const files = await renderExportFiles();
+      if (!files.length) return;
+      if (mode === "images") {
+        for (const file of files) {
+          downloadBlob(new Blob([file.data], { type: "image/png" }), file.name);
         }
-        files.push({
-          name: `rednote-page-${String(page + 1).padStart(2, "0")}.png`,
-          data: dataUrlToBytes(dataUrl)
-        });
+        return;
       }
       downloadBlob(createZipBlob(files), `rednote-${templateId}-${ratio.replace(":", "x")}.zip`);
     } catch (err) {
@@ -860,34 +948,167 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">
-          <FileText size={20} />
+        <div className="brand" aria-label="Rednote Markdown Studio">
+          <FileText size={20} aria-hidden="true" />
           <span>Rednote Markdown Studio</span>
         </div>
         <div className="topbar-actions">
-          <select value={ratio} onChange={(event) => setRatio(event.target.value as RatioId)} aria-label="Preview ratio">
+          <select className="desktop-topbar-control" value={ratio} onChange={(event) => setRatio(event.target.value as RatioId)} aria-label="选择导出画布比例">
             <option value="9:16">9:16 · 1080×1920</option>
             <option value="3:4">3:4 · 1080×1440</option>
             <option value="1:1">1:1 · 1080×1080</option>
             <option value="full">全文长图 · 1080×自适应</option>
           </select>
-          <button type="button" onClick={resetToTemplateContent} title="恢复当前模板的默认内容模板">
+          <button className="desktop-topbar-control" type="button" onClick={resetToTemplateContent} title="恢复当前模板的默认内容模板">
             <RotateCcw size={15} />
             恢复模板内容
           </button>
+          <div className="mobile-template-picker" ref={mobileTemplatePickerRef}>
+            <button
+              type="button"
+              className={isTemplatePickerOpen ? "mobile-template-button is-open" : "mobile-template-button"}
+              onClick={() => {
+                setIsTemplatePickerOpen((open) => !open);
+                setIsMobileSettingsOpen(false);
+                setIsExportMenuOpen(false);
+              }}
+              aria-haspopup="dialog"
+              aria-expanded={isTemplatePickerOpen}
+              aria-label="选择模板"
+              title="模板"
+            >
+              模板
+              <ChevronDown size={15} />
+            </button>
+            {isTemplatePickerOpen && (
+              <div className="template-menu mobile-template-menu" role="dialog" aria-label="选择模板">
+                <div className="mobile-template-list">
+                  {templateList.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className={item.id === templateId ? "is-active" : ""}
+                      style={{ "--template-accent": templateAccentMap[item.id] || "#d39a1a" } as React.CSSProperties}
+                      aria-pressed={item.id === templateId}
+                      onClick={() => {
+                        setTemplateId(item.id);
+                        setMobileMode("preview");
+                        setIsTemplatePickerOpen(false);
+                      }}
+                    >
+                      <span className="template-menu-accent" aria-hidden="true" />
+                      <strong>{item.name}</strong>
+                      {item.id === templateId && <em>当前</em>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="mobile-settings-button"
+            onClick={() => {
+              setIsMobileSettingsOpen((open) => !open);
+              setIsTemplatePickerOpen(false);
+              setIsExportMenuOpen(false);
+            }}
+            aria-expanded={isMobileSettingsOpen}
+            aria-haspopup="dialog"
+            aria-label="打开设置菜单"
+            title="设置"
+          >
+            <SlidersHorizontal size={16} />
+            设置
+          </button>
+          {isMobileSettingsOpen && (
+            <div className="mobile-settings-menu" ref={mobileSettingsRef} role="dialog" aria-label="移动端设置菜单">
+              <div className="mobile-settings-field">
+                <span>导出比例</span>
+                <div className="mobile-ratio-options" role="group" aria-label="导出比例">
+                  {([
+                    ["9:16", "9:16"],
+                    ["3:4", "3:4"],
+                    ["1:1", "1:1"],
+                    ["full", "长图"]
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={ratio === value ? "is-active" : ""}
+                      aria-pressed={ratio === value}
+                      onClick={() => setRatio(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mobile-setting-stepper" role="group" aria-label="预览字号">
+                <span>字号</span>
+                <button type="button" onClick={() => setFontScale((value) => Math.max(0.82, Number((value - 0.06).toFixed(2))))} aria-label="减小预览字体">-</button>
+                <strong>{Math.round(fontScale * 100)}%</strong>
+                <button type="button" onClick={() => setFontScale((value) => Math.min(1.28, Number((value + 0.06).toFixed(2))))} aria-label="增大预览字体">+</button>
+              </div>
+
+              <div className="mobile-setting-stepper" role="group" aria-label="页边距">
+                <span>边距</span>
+                <button type="button" onClick={() => setPagePadding((value) => Math.max(0, value - 4))} aria-label="减小页边距">-</button>
+                <strong>{pagePadding}px</strong>
+                <button type="button" onClick={() => setPagePadding((value) => Math.min(80, value + 4))} aria-label="增大页边距">+</button>
+              </div>
+
+              <button type="button" className="mobile-menu-action" onClick={resetToTemplateContent}>
+                <RotateCcw size={15} />
+                恢复模板内容
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="workspace">
-        <section className="preview-pane" ref={previewPaneRef}>
+      <nav className="mobile-mode-switcher" aria-label="移动端工作模式">
+        {([
+          ["editor", "编辑"],
+          ["preview", "预览"]
+        ] as const).map(([mode, label]) => (
+          <button
+            key={mode}
+            type="button"
+            className={mobileMode === mode ? "is-active" : ""}
+            aria-pressed={mobileMode === mode}
+            onClick={() => setMobileMode(mode)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div
+        ref={measureRef}
+        className={`pagination-measurer ${template.canvasClassName}`}
+        style={{
+          "--preview-design-width": `${previewDesignWidthPx}px`,
+          "--preview-font-scale": fontScale,
+          "--page-padding": `${pagePadding}px`
+        } as React.CSSProperties}
+      />
+
+      <main className={`workspace mobile-mode-${mobileMode}`}>
+        <section className="preview-pane" ref={previewPaneRef} aria-label="图片预览">
           <div className="preview-toolbar">
             <div className="template-picker preview-template-picker" ref={templatePickerRef}>
               <button
                 type="button"
                 className={isTemplatePickerOpen ? "is-open" : ""}
-                onClick={() => setIsTemplatePickerOpen((open) => !open)}
+                onClick={() => {
+                  setIsTemplatePickerOpen((open) => !open);
+                  setIsExportMenuOpen(false);
+                }}
                 aria-haspopup="dialog"
                 aria-expanded={isTemplatePickerOpen}
+                aria-label="选择模板"
                 title="选择模板"
               >
                 <span className="template-picker-label">
@@ -904,6 +1125,7 @@ function App() {
                         key={item.id}
                         className={item.id === templateId ? "is-active" : ""}
                         style={{ "--template-accent": templateAccentMap[item.id] || "#d39a1a" } as React.CSSProperties}
+                        aria-current={item.id === templateId ? "true" : undefined}
                         onClick={() => {
                           setTemplateId(item.id);
                           setIsTemplatePickerOpen(false);
@@ -929,27 +1151,68 @@ function App() {
               onDecreasePadding={() => setPagePadding((value) => Math.max(0, value - 4))}
               onIncreasePadding={() => setPagePadding((value) => Math.min(80, value + 4))}
             />
+            <div className="export-control" ref={desktopExportRef}>
+              <button
+                type="button"
+                className="preview-export-button"
+                onClick={() => {
+                  setIsExportMenuOpen((open) => !open);
+                  setIsTemplatePickerOpen(false);
+                  setIsMobileSettingsOpen(false);
+                }}
+                disabled={busy === "export"}
+                title="导出"
+                aria-label={busy === "export" ? "导出中" : "打开导出菜单"}
+                aria-haspopup="menu"
+                aria-expanded={isExportMenuOpen}
+              >
+                <Download size={16} />
+              </button>
+              {isExportMenuOpen && (
+                <ExportMenu
+                  onDownloadImages={() => exportImages("images")}
+                  onDownloadZip={() => exportImages("zip")}
+                />
+              )}
+            </div>
+          </div>
+          <div className="mobile-preview-actions" ref={mobileExportRef}>
             <button
               type="button"
-              className="preview-export-button"
-              onClick={exportImages}
+              className="primary"
+              onClick={() => {
+                setIsExportMenuOpen((open) => !open);
+                setIsTemplatePickerOpen(false);
+                setIsMobileSettingsOpen(false);
+              }}
               disabled={busy === "export"}
-              title="导出 ZIP"
-              aria-label={busy === "export" ? "导出中" : "导出"}
+              title={busy === "export" ? "导出中" : "导出"}
+              aria-label={busy === "export" ? "导出中" : "打开导出菜单"}
+              aria-haspopup="menu"
+              aria-expanded={isExportMenuOpen}
             >
               <Download size={16} />
             </button>
+            {isExportMenuOpen && (
+              <ExportMenu
+                onDownloadImages={() => exportImages("images")}
+                onDownloadZip={() => exportImages("zip")}
+              />
+            )}
           </div>
-          <div className="phone-frame" ref={phoneFrameRef}>
+          <div
+            className="phone-frame"
+            ref={phoneFrameRef}
+            style={{
+              "--preview-design-width": `${previewDesignWidthPx}px`,
+              "--preview-scale": previewScale,
+              "--preview-frame-height": previewFrameHeight > 0 ? `${previewFrameHeight}px` : undefined
+            } as React.CSSProperties}
+          >
             <div
               ref={canvasRef}
               className={isFullRatio ? "phone-canvas phone-canvas-full" : "phone-canvas"}
             >
-              <div
-                ref={measureRef}
-                className={`pagination-measurer ${template.canvasClassName}`}
-                style={{ "--preview-font-scale": fontScale, "--page-padding": `${pagePadding}px` } as React.CSSProperties}
-              />
               <div className="preview-pages">
                 {pages.map((page, pageIndex) => (
                   <div
@@ -986,16 +1249,16 @@ function App() {
             </div>
           </div>
 
-          {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
         </section>
 
         <div className="sync-rail" aria-label="内容映射">
-          <button type="button" onClick={syncPreviewToEditorBlock} title="定位预览到当前编辑内容">↤</button>
+          <button type="button" onClick={syncPreviewToEditorBlock} title="定位预览到当前编辑内容" aria-label="定位预览到当前编辑内容">↤</button>
           <span>{activeBlockId ? "已定位" : "同步"}</span>
-          <button type="button" onClick={syncEditorToPreviewBlock} disabled={!activeBlockId} title="定位编辑器到当前预览内容">↦</button>
+          <button type="button" onClick={syncEditorToPreviewBlock} disabled={!activeBlockId} title="定位编辑器到当前预览内容" aria-label="定位编辑器到当前预览内容">↦</button>
         </div>
 
-        <section className="editor-pane">
+        <section className="editor-pane" aria-label="Markdown 编辑器">
           <MarkdownToolbar
             template={template}
             undo={undo}
@@ -1038,8 +1301,10 @@ function App() {
             onKeyDown={handleEditorKeyDown}
             onFocus={handleEditorFocus}
             spellCheck={false}
+            aria-label="Markdown 内容"
           />
         </section>
+
       </main>
     </div>
   );
@@ -1410,6 +1675,44 @@ function toTemplateRenderUnit(unit: PageUnit): TemplateRenderUnit {
   };
 }
 
+function getBlockTypeLabel(type: MarkdownBlock["type"]) {
+  switch (type) {
+    case "heading":
+      return "标题";
+    case "paragraph":
+      return "段落";
+    case "list":
+      return "列表";
+    case "quote":
+      return "引用";
+    case "code":
+      return "代码块";
+    case "divider":
+      return "分隔线";
+    case "image":
+      return "图片";
+    case "spacer":
+      return "空行";
+    default:
+      return "内容块";
+  }
+}
+
+function getSelectableBlockProps(block: MarkdownBlock, onSelectBlock?: (blockId: string) => void): React.HTMLAttributes<HTMLElement> {
+  if (!onSelectBlock) return {};
+
+  return {
+    role: "button",
+    tabIndex: 0,
+    "aria-label": `选择${getBlockTypeLabel(block.type)}对应的 Markdown 内容`,
+    onKeyDown: (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      onSelectBlock(block.id);
+    }
+  };
+}
+
 function RenderedPage({
   template,
   units,
@@ -1494,8 +1797,8 @@ function RenderedUnit({
   if (block.type === "code" && block.lang === "html") return <HtmlBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
   if (block.type === "code") return <CodeBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
   if (block.type === "image") return <ImageBlock block={block} activeBlockId={activeBlockId} onSelectBlock={onSelectBlock} />;
-  if (block.type === "divider") return <hr className={block.id === activeBlockId ? "section-divider is-sync-active" : "section-divider"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} />;
-  if (block.type === "spacer") return <div className={block.id === activeBlockId ? "block block-spacer is-sync-active" : "block block-spacer"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} />;
+  if (block.type === "divider") return <hr className={block.id === activeBlockId ? "section-divider is-sync-active" : "section-divider"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} {...getSelectableBlockProps(block, onSelectBlock)} />;
+  if (block.type === "spacer") return <div className={block.id === activeBlockId ? "block block-spacer is-sync-active" : "block block-spacer"} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} {...getSelectableBlockProps(block, onSelectBlock)} />;
 
   const className = [
     "block",
@@ -1510,7 +1813,7 @@ function RenderedUnit({
   ].filter(Boolean).join(" ");
 
   return (
-    <div className={className} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)}>
+    <div className={className} data-flow-unit-id={unit.id} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} {...getSelectableBlockProps(block, onSelectBlock)}>
       <div className={`markdown-text ${unit.text.trim() ? "" : "spacer-line"}`}>
         {unit.text.trim() ? <InlineText text={unit.text} /> : "\u00a0"}
       </div>
@@ -1546,7 +1849,7 @@ function RenderedListGroup({
   ].filter(Boolean).join(" ");
 
   return (
-    <div className={className} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)}>
+    <div className={className} data-source-block-id={block.id} onClick={() => onSelectBlock?.(block.id)} {...getSelectableBlockProps(block, onSelectBlock)}>
       {units.map((unit) => (
         <div
           key={unit.id}
@@ -1663,108 +1966,108 @@ function MarkdownToolbar({
   return (
     <div className="markdown-toolbar" aria-label="Markdown 格式工具栏">
       {templateSupportsHeadingLevel(template, 1) && (
-        <button type="button" onClick={onHeading1} title="一级标题 Cmd/Ctrl+Shift+1">
+        <button type="button" onClick={onHeading1} title="一级标题 Cmd/Ctrl+Shift+1" aria-label="设置一级标题">
           <Heading1 size={16} />
         </button>
       )}
       {templateSupportsHeadingLevel(template, 2) && (
-        <button type="button" onClick={onHeading2} title="二级标题 Cmd/Ctrl+Shift+2">
+        <button type="button" onClick={onHeading2} title="二级标题 Cmd/Ctrl+Shift+2" aria-label="设置二级标题">
           <Heading2 size={16} />
         </button>
       )}
       {templateSupportsHeadingLevel(template, 3) && (
-        <button type="button" onClick={onHeading3} title="三级标题 Cmd/Ctrl+Shift+3">
+        <button type="button" onClick={onHeading3} title="三级标题 Cmd/Ctrl+Shift+3" aria-label="设置三级标题">
           <Heading3 size={16} />
         </button>
       )}
       {templateSupportsHeadingLevel(template, 4) && (
-        <button type="button" onClick={onHeading4} title="四级标题 Cmd/Ctrl+Shift+4">
+        <button type="button" onClick={onHeading4} title="四级标题 Cmd/Ctrl+Shift+4" aria-label="设置四级标题">
           <Heading4 size={16} />
         </button>
       )}
       {templateSupportsHeadingLevel(template, 5) && (
-        <button type="button" onClick={onHeading5} title="五级标题 Cmd/Ctrl+Shift+5">
+        <button type="button" onClick={onHeading5} title="五级标题 Cmd/Ctrl+Shift+5" aria-label="设置五级标题">
           <Heading5 size={16} />
         </button>
       )}
       {templateSupportsHeadingLevel(template, 6) && (
-        <button type="button" onClick={onHeading6} title="六级标题 Cmd/Ctrl+Shift+6">
+        <button type="button" onClick={onHeading6} title="六级标题 Cmd/Ctrl+Shift+6" aria-label="设置六级标题">
           <Heading6 size={16} />
         </button>
       )}
       {hasHeadingTools && hasInlineTools && <span className="toolbar-separator" />}
       {templateSupportsInlineFormat(template, "bold") && (
-        <button type="button" onClick={onBold} title="加粗 Cmd/Ctrl+Shift+B">
+        <button type="button" onClick={onBold} title="加粗 Cmd/Ctrl+Shift+B" aria-label="加粗选中文本">
           <Bold size={16} />
         </button>
       )}
       {templateSupportsInlineFormat(template, "highlight") && (
-        <button type="button" onClick={onHighlight} title="高亮 Cmd/Ctrl+Shift+H">
+        <button type="button" onClick={onHighlight} title="高亮 Cmd/Ctrl+Shift+H" aria-label="高亮选中文本">
           <Highlighter size={16} />
         </button>
       )}
       {templateSupportsInlineFormat(template, "italic") && (
-        <button type="button" onClick={onItalic} title="斜体 Cmd/Ctrl+Shift+I">
+        <button type="button" onClick={onItalic} title="斜体 Cmd/Ctrl+Shift+I" aria-label="设置选中文本为斜体">
           <Italic size={16} />
         </button>
       )}
       {templateSupportsInlineFormat(template, "strike") && (
-        <button type="button" onClick={onStrike} title="删除线 Cmd/Ctrl+Shift+X">
+        <button type="button" onClick={onStrike} title="删除线 Cmd/Ctrl+Shift+X" aria-label="给选中文本添加删除线">
           <Strikethrough size={16} />
         </button>
       )}
       {templateSupportsInlineFormat(template, "underline") && (
-        <button type="button" onClick={onUnderline} title="下划线 Cmd/Ctrl+Shift+U">
+        <button type="button" onClick={onUnderline} title="下划线 Cmd/Ctrl+Shift+U" aria-label="给选中文本添加下划线">
           <Underline size={16} />
         </button>
       )}
       {templateSupportsInlineFormat(template, "code") && (
-        <button type="button" onClick={onInlineCode} title="行内代码 Cmd/Ctrl+Shift+E">
+        <button type="button" onClick={onInlineCode} title="行内代码 Cmd/Ctrl+Shift+E" aria-label="设置选中文本为行内代码">
           <Code2 size={16} />
         </button>
       )}
       {templateSupportsInlineFormat(template, "link") && (
-        <button type="button" onClick={onLink} title="链接 Cmd/Ctrl+Shift+K">
+        <button type="button" onClick={onLink} title="链接 Cmd/Ctrl+Shift+K" aria-label="给选中文本添加链接">
           <Link size={16} />
         </button>
       )}
       {hasInlineTools && hasBlockTools && <span className="toolbar-separator" />}
       {templateSupportsBlock(template, "quote") && (
-        <button type="button" onClick={onQuote} title="引用 Cmd/Ctrl+Shift+.">
+        <button type="button" onClick={onQuote} title="引用 Cmd/Ctrl+Shift+." aria-label="插入引用">
           <Quote size={16} />
         </button>
       )}
       {templateSupportsBlock(template, "list") && (
-        <button type="button" onClick={onOrderedList} title="有编号列表 Cmd/Ctrl+Shift+7">
+        <button type="button" onClick={onOrderedList} title="有编号列表 Cmd/Ctrl+Shift+7" aria-label="插入有编号列表">
           <ListOrdered size={16} />
         </button>
       )}
       {templateSupportsBlock(template, "list") && (
-        <button type="button" onClick={onUnorderedList} title="无编号列表 Cmd/Ctrl+Shift+8">
+        <button type="button" onClick={onUnorderedList} title="无编号列表 Cmd/Ctrl+Shift+8" aria-label="插入无编号列表">
           <List size={16} />
         </button>
       )}
       {templateSupportsBlock(template, "code") && (
-        <button type="button" onClick={onCodeBlock} title="代码块 Cmd/Ctrl+Shift+C">
+        <button type="button" onClick={onCodeBlock} title="代码块 Cmd/Ctrl+Shift+C" aria-label="插入代码块">
           <Code2 size={16} />
         </button>
       )}
       {templateSupportsBlock(template, "divider") && (
-        <button type="button" onClick={onDivider} title="分隔线 Cmd/Ctrl+Shift+-">
+        <button type="button" onClick={onDivider} title="分隔线 Cmd/Ctrl+Shift+-" aria-label="插入分隔线">
           <Minus size={16} />
         </button>
       )}
       {templateSupportsBlock(template, "image") && (
-        <button type="button" onClick={onImage} title="图片 Cmd/Ctrl+Shift+P">
+        <button type="button" onClick={onImage} title="图片 Cmd/Ctrl+Shift+P" aria-label="插入图片">
           <ImagePlus size={16} />
         </button>
       )}
       <span className="toolbar-spacer" />
       <div className="toolbar-history" aria-label="编辑历史">
-        <button type="button" onClick={undo} disabled={!canUndo} title="撤销">
+        <button type="button" onClick={undo} disabled={!canUndo} title="撤销" aria-label="撤销上一次编辑">
           <ChevronLeft size={15} />
         </button>
-        <button type="button" onClick={redo} disabled={!canRedo} title="重做">
+        <button type="button" onClick={redo} disabled={!canRedo} title="重做" aria-label="重做上一次编辑">
           <ChevronRight size={15} />
         </button>
       </div>
@@ -1787,6 +2090,7 @@ function CodeBlock({
       data-flow-unit-id={block.id}
       data-source-block-id={block.id}
       onClick={() => onSelectBlock?.(block.id)}
+      {...getSelectableBlockProps(block, onSelectBlock)}
     >
       <pre className="code-card">
         {block.lang && <span className="code-language">{block.lang}</span>}
@@ -1811,6 +2115,7 @@ function HtmlBlock({
       data-flow-unit-id={block.id}
       data-source-block-id={block.id}
       onClick={() => onSelectBlock?.(block.id)}
+      {...getSelectableBlockProps(block, onSelectBlock)}
     >
       <div className="infographic-card" dangerouslySetInnerHTML={{ __html: block.text }} />
     </div>
@@ -1848,6 +2153,7 @@ function ImageBlock({
       data-flow-unit-id={block.id}
       data-source-block-id={block.id}
       onClick={() => onSelectBlock?.(block.id)}
+      {...getSelectableBlockProps(block, onSelectBlock)}
     >
       <figure className={imageClassName}>
         {imageUrl && !failed ? (
@@ -1906,6 +2212,8 @@ function SegmentedOption<T extends string>({
             key={option}
             type="button"
             className={option === value ? "is-active" : ""}
+            aria-pressed={option === value}
+            aria-label={`${label}：${labels[option]}`}
             onClick={() => onChange(option)}
           >
             {labels[option]}
@@ -1940,20 +2248,41 @@ function PanelBar({
         {fontScale && onDecreaseFont && onIncreaseFont && (
           <div className="font-controls">
             <span>字号</span>
-            <button type="button" onClick={onDecreaseFont} title="减小预览字体">-</button>
+            <button type="button" onClick={onDecreaseFont} title="减小预览字体" aria-label="减小预览字体">-</button>
             <strong>{Math.round(fontScale * 100)}%</strong>
-            <button type="button" onClick={onIncreaseFont} title="增大预览字体">+</button>
+            <button type="button" onClick={onIncreaseFont} title="增大预览字体" aria-label="增大预览字体">+</button>
           </div>
         )}
         {pagePadding != null && onDecreasePadding && onIncreasePadding && (
           <div className="font-controls">
             <span>边距</span>
-            <button type="button" onClick={onDecreasePadding} title="减小页边距">-</button>
+            <button type="button" onClick={onDecreasePadding} title="减小页边距" aria-label="减小页边距">-</button>
             <strong>{pagePadding}px</strong>
-            <button type="button" onClick={onIncreasePadding} title="增大页边距">+</button>
+            <button type="button" onClick={onIncreasePadding} title="增大页边距" aria-label="增大页边距">+</button>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ExportMenu({
+  onDownloadImages,
+  onDownloadZip
+}: {
+  onDownloadImages: () => void;
+  onDownloadZip: () => void;
+}) {
+  return (
+    <div className="export-menu" role="menu" aria-label="导出选项">
+      <button type="button" role="menuitem" onClick={onDownloadImages}>
+        <Image size={15} />
+        下载图片
+      </button>
+      <button type="button" role="menuitem" onClick={onDownloadZip}>
+        <Download size={15} />
+        下载压缩包
+      </button>
     </div>
   );
 }
