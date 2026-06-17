@@ -291,6 +291,7 @@ function App() {
   const [mobileMode, setMobileMode] = useState<MobileMode>("editor");
   const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isMobileEditorToolbarVisible, setIsMobileEditorToolbarVisible] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const phoneFrameRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -301,6 +302,8 @@ function App() {
   const desktopExportRef = useRef<HTMLDivElement>(null);
   const mobileExportRef = useRef<HTMLDivElement>(null);
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const workspaceGestureRef = useRef<{ x: number; y: number; mode: MobileMode } | null>(null);
+  const suppressNextWorkspaceClickRef = useRef(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingImageSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const preserveActiveBlockOnEditorFocusRef = useRef(false);
@@ -552,6 +555,40 @@ function App() {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [isExportMenuOpen]);
 
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const updateKeyboardOffset = () => {
+      const viewport = window.visualViewport;
+      const editor = markdownTextareaRef.current;
+      const isEditorFocused = document.activeElement === editor;
+      const isMobileWidth = window.matchMedia("(max-width: 960px)").matches;
+      const offset = viewport && isEditorFocused && isMobileWidth
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0;
+      setIsMobileEditorToolbarVisible(isEditorFocused && isMobileWidth && offset > 24);
+      root.style.setProperty("--keyboard-offset", `${Math.round(offset)}px`);
+    };
+    const handleFocusOut = () => {
+      window.setTimeout(updateKeyboardOffset, 80);
+    };
+
+    updateKeyboardOffset();
+    window.visualViewport?.addEventListener("resize", updateKeyboardOffset);
+    window.visualViewport?.addEventListener("scroll", updateKeyboardOffset);
+    window.addEventListener("resize", updateKeyboardOffset);
+    document.addEventListener("focusin", updateKeyboardOffset);
+    document.addEventListener("focusout", handleFocusOut);
+    return () => {
+      setIsMobileEditorToolbarVisible(false);
+      root.style.removeProperty("--keyboard-offset");
+      window.visualViewport?.removeEventListener("resize", updateKeyboardOffset);
+      window.visualViewport?.removeEventListener("scroll", updateKeyboardOffset);
+      window.removeEventListener("resize", updateKeyboardOffset);
+      document.removeEventListener("focusin", updateKeyboardOffset);
+      document.removeEventListener("focusout", handleFocusOut);
+    };
+  }, []);
+
   function pushUndoSnapshot(current: string) {
     setUndoStack((items) => [current, ...items].slice(0, 50));
     setRedoStack([]);
@@ -561,6 +598,94 @@ function App() {
     pushUndoSnapshot(markdown);
     setActiveBlockId(null);
     setMarkdown(value);
+  }
+
+  function isMobileViewport() {
+    return window.matchMedia("(max-width: 960px)").matches;
+  }
+
+  function updateActiveBlockFromEditorSelection({ scroll = false } = {}) {
+    const textarea = markdownTextareaRef.current;
+    if (!textarea) return activeBlockId;
+    const block = findBlockAtOffset(blocks, textarea.selectionStart, markdown);
+    if (!block) return null;
+    setActiveBlockId(block.id);
+    if (scroll) {
+      requestAnimationFrame(() => scrollPreviewBlockIntoView(block.id));
+    }
+    return block.id;
+  }
+
+  function switchMobileMode(nextMode: MobileMode) {
+    setIsTemplatePickerOpen(false);
+    setIsMobileSettingsOpen(false);
+    setIsExportMenuOpen(false);
+
+    if (nextMode === "preview") {
+      const blockId = updateActiveBlockFromEditorSelection();
+      markdownTextareaRef.current?.blur();
+      setMobileMode("preview");
+      const targetBlockId = blockId || activeBlockId;
+      if (targetBlockId) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => scrollPreviewBlockIntoView(targetBlockId));
+        });
+      }
+      return;
+    }
+
+    setMobileMode("editor");
+  }
+
+  function handleEditorSelectionChange() {
+    updateActiveBlockFromEditorSelection();
+  }
+
+  function handleMobileWorkspacePointerDown(event: React.PointerEvent<HTMLElement>) {
+    if (!isMobileViewport() || event.pointerType === "mouse") return;
+    workspaceGestureRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      mode: mobileMode
+    };
+  }
+
+  function handleMobileWorkspacePointerUp(event: React.PointerEvent<HTMLElement>) {
+    const start = workspaceGestureRef.current;
+    workspaceGestureRef.current = null;
+    if (!start || !isMobileViewport()) return;
+
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+
+    suppressNextWorkspaceClickRef.current = true;
+    switchMobileMode(start.mode === "editor" ? "preview" : "editor");
+  }
+
+  function handleMobileWorkspacePointerCancel() {
+    workspaceGestureRef.current = null;
+  }
+
+  function handleWorkspaceClickCapture(event: React.MouseEvent<HTMLElement>) {
+    if (!suppressNextWorkspaceClickRef.current) return;
+    suppressNextWorkspaceClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function handlePreviewPaneClickCapture(event: React.MouseEvent<HTMLElement>) {
+    if (!isMobileViewport() || mobileMode !== "editor") return;
+    event.preventDefault();
+    event.stopPropagation();
+    switchMobileMode("preview");
+  }
+
+  function handleEditorPaneClickCapture(event: React.MouseEvent<HTMLElement>) {
+    if (!isMobileViewport() || mobileMode !== "preview") return;
+    event.preventDefault();
+    event.stopPropagation();
+    switchMobileMode("editor");
   }
 
   function syncPreviewToEditorBlock() {
@@ -591,7 +716,7 @@ function App() {
       preserveActiveBlockOnEditorFocusRef.current = false;
       return;
     }
-    setActiveBlockId(null);
+    updateActiveBlockFromEditorSelection();
   }
 
   function updateImageOptions(blockId: string, patch: Partial<ImageOptions>) {
@@ -946,7 +1071,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={isMobileEditorToolbarVisible ? "app-shell is-mobile-editor-toolbar-visible" : "app-shell"}>
       <header className="topbar">
         <div className="brand" aria-label="Rednote Markdown Studio">
           <FileText size={20} aria-hidden="true" />
@@ -1078,7 +1203,7 @@ function App() {
             type="button"
             className={mobileMode === mode ? "is-active" : ""}
             aria-pressed={mobileMode === mode}
-            onClick={() => setMobileMode(mode)}
+            onClick={() => switchMobileMode(mode)}
           >
             {label}
           </button>
@@ -1095,8 +1220,19 @@ function App() {
         } as React.CSSProperties}
       />
 
-      <main className={`workspace mobile-mode-${mobileMode}`}>
-        <section className="preview-pane" ref={previewPaneRef} aria-label="图片预览">
+      <main
+        className={`workspace mobile-mode-${mobileMode}`}
+        onPointerDown={handleMobileWorkspacePointerDown}
+        onPointerUp={handleMobileWorkspacePointerUp}
+        onPointerCancel={handleMobileWorkspacePointerCancel}
+        onClickCapture={handleWorkspaceClickCapture}
+      >
+        <section
+          className="preview-pane"
+          ref={previewPaneRef}
+          aria-label="图片预览"
+          onClickCapture={handlePreviewPaneClickCapture}
+        >
           <div className="preview-toolbar">
             <div className="template-picker preview-template-picker" ref={templatePickerRef}>
               <button
@@ -1258,7 +1394,7 @@ function App() {
           <button type="button" onClick={syncEditorToPreviewBlock} disabled={!activeBlockId} title="定位编辑器到当前预览内容" aria-label="定位编辑器到当前预览内容">↦</button>
         </div>
 
-        <section className="editor-pane" aria-label="Markdown 编辑器">
+        <section className="editor-pane" aria-label="Markdown 编辑器" onClickCapture={handleEditorPaneClickCapture}>
           <MarkdownToolbar
             template={template}
             undo={undo}
@@ -1299,6 +1435,9 @@ function App() {
             value={markdown}
             onChange={(event) => handleMarkdownChange(event.target.value)}
             onKeyDown={handleEditorKeyDown}
+            onKeyUp={handleEditorSelectionChange}
+            onClick={handleEditorSelectionChange}
+            onSelect={handleEditorSelectionChange}
             onFocus={handleEditorFocus}
             spellCheck={false}
             aria-label="Markdown 内容"

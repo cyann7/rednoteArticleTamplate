@@ -216,7 +216,7 @@ The app shell is mostly flat and uses borders for structure. Elevation appears i
 ### Navigation
 - **Style:** The topbar is a 60px fixed-height command strip with brand on the left and output controls on the right.
 - **Default / Hover / Active:** Selects and buttons share the same border and hover vocabulary. Template picker open state uses a warmer border to connect with template choice.
-- **Mobile Treatment:** Mobile uses two task pages: Edit and Preview. Edit is the default mode, with the Markdown toolbar pinned near the bottom edge so it can sit above the software keyboard. Preview shows the page canvas without the desktop sync rail and owns a small floating export menu. Template choice is a separate topbar control beside Settings. Settings uses one flat menu with direct controls for ratio, font size, page padding, and content reset.
+- **Mobile Treatment:** Mobile uses two task pages: Edit and Preview. Edit is the default mode, with the Markdown toolbar hidden until the software keyboard opens; then it fixes to the visual viewport directly above the keyboard. Preview shows the page canvas without the desktop sync rail and owns a small floating export menu. Template choice is a separate topbar control beside Settings. Settings uses one flat menu with direct controls for ratio, font size, page padding, and content reset.
 
 ### Preview Workspace
 

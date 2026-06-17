@@ -1301,16 +1301,29 @@ button.primary {
   }
 
   .workspace {
+    --mobile-peek: 38px;
+    --mobile-peek-double: 76px;
+    position: relative;
     display: block;
     height: auto;
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    background: #ffffff;
+    touch-action: pan-y;
   }
 
   .preview-pane {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: calc(100% - var(--mobile-peek));
     height: 100%;
     padding: 12px 12px 20px;
+    transition: left 180ms ease, opacity 180ms ease;
+    will-change: left;
+    border-left: 1px solid var(--app-border-soft);
+    background: #fafafa;
   }
 
   .preview-toolbar {
@@ -1325,62 +1338,71 @@ button.primary {
     width: min(100%, var(--preview-design-width));
   }
 
-  .mobile-mode-editor .preview-pane,
-  .mobile-mode-editor .sync-rail,
-  .mobile-mode-preview .editor-pane,
-  .mobile-mode-preview .sync-rail {
+  .sync-rail {
     display: none;
   }
 
-  .mobile-mode-preview .preview-pane,
-  .mobile-mode-editor .editor-pane {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    overflow: auto;
+  .mobile-mode-editor .preview-pane {
+    left: calc(100% - var(--mobile-peek));
+    opacity: 0.88;
+    cursor: pointer;
   }
 
-  .sync-rail {
-    height: auto;
-    min-height: 42px;
-    flex-direction: row;
-    border-left: 0;
-    border-top: 1px solid #dedede;
-    border-bottom: 1px solid #dedede;
-    background: #fafafa;
-  }
-
-  .sync-rail button {
-    width: 44px;
-    height: 34px;
-    border-radius: 6px;
-    transform: none;
-  }
-
-  .sync-rail span {
-    display: inline;
-    color: #737373;
-    font-size: 12px;
-    font-weight: 650;
+  .mobile-mode-preview .preview-pane {
+    left: var(--mobile-peek);
+    opacity: 1;
   }
 
   .editor-pane {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(100% - var(--mobile-peek));
     height: 100%;
     padding: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    border-right: 1px solid var(--app-border-soft);
+    background: #ffffff;
+    transition: left 180ms ease, opacity 180ms ease;
+    will-change: left;
+  }
+
+  .mobile-mode-editor .editor-pane {
+    left: 0;
+    opacity: 1;
+  }
+
+  .mobile-mode-preview .editor-pane {
+    left: calc(-100% + var(--mobile-peek-double));
+    opacity: 0.9;
+    cursor: pointer;
   }
 
   .markdown-toolbar {
-    order: 2;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--keyboard-offset, 0px) + max(8px, env(safe-area-inset-bottom)));
+    display: none;
     min-height: 48px;
-    margin: 8px 0 0;
+    margin: 0;
     overflow-x: auto;
     flex-wrap: nowrap;
     scrollbar-width: none;
-    position: sticky;
-    bottom: max(8px, env(safe-area-inset-bottom));
-    z-index: 24;
+    z-index: 86;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .app-shell.is-mobile-editor-toolbar-visible .editor-pane {
+    padding-bottom: 72px;
+  }
+
+  .app-shell.is-mobile-editor-toolbar-visible .markdown-toolbar {
+    display: flex;
   }
 
   .markdown-toolbar::-webkit-scrollbar {
@@ -1399,11 +1421,14 @@ button.primary {
   }
 
   .editor-pane textarea {
-    order: 1;
     flex: 1;
     padding: 14px;
     font-size: 16px;
     line-height: 1.65;
+  }
+
+  .app-shell.is-mobile-editor-toolbar-visible .editor-pane textarea {
+    padding-bottom: 84px;
   }
 
   .mobile-template-list {
@@ -1458,6 +1483,11 @@ button.primary {
     margin: 0;
     padding: 0;
     pointer-events: none;
+  }
+
+  .mobile-mode-editor .mobile-preview-actions,
+  .mobile-mode-editor .preview-image-controls {
+    display: none;
   }
 
   .mobile-preview-actions > button {
