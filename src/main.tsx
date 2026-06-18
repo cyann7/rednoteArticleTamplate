@@ -431,7 +431,7 @@ function App() {
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [flowUnits, template.canvasClassName, fontScale, pageHeightPx, pagePadding, layoutRevision, isFullRatio, mobileMode]);
+  }, [flowUnits, template.canvasClassName, fontScale, pageHeightPx, pagePadding, layoutRevision, isFullRatio]);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -684,12 +684,16 @@ function App() {
 
   function restoreMobileScrollPosition(mode: MobileMode) {
     if (!isMobileViewport()) return;
-    requestAnimationFrame(() => {
+    const restore = () => {
       if (mode === "preview") {
         if (previewPaneRef.current) previewPaneRef.current.scrollTop = mobilePreviewScrollTopRef.current;
         return;
       }
       if (markdownTextareaRef.current) markdownTextareaRef.current.scrollTop = mobileEditorScrollTopRef.current;
+    };
+    requestAnimationFrame(() => {
+      restore();
+      requestAnimationFrame(restore);
     });
   }
 
@@ -719,7 +723,7 @@ function App() {
   }
 
   function handlePreviewPaneScroll() {
-    if (!isMobileViewport()) return;
+    if (!isMobileViewport() || mobileMode !== "preview") return;
     mobilePreviewScrollTopRef.current = previewPaneRef.current?.scrollTop ?? 0;
   }
 
