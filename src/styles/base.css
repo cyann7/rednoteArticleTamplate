@@ -131,7 +131,8 @@ button.primary {
 .mobile-template-picker,
 .mobile-settings-button,
 .mobile-settings-menu,
-.mobile-preview-actions {
+.mobile-preview-actions,
+.mobile-page-switch {
   display: none;
 }
 
@@ -1274,8 +1275,6 @@ button.primary {
   }
 
   .workspace {
-    --mobile-peek: 38px;
-    --mobile-peek-double: 76px;
     position: relative;
     display: block;
     height: auto;
@@ -1290,12 +1289,11 @@ button.primary {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: calc(100% - var(--mobile-peek));
+    width: 100%;
     height: 100%;
     padding: 12px 12px 20px;
     transition: left 180ms ease, opacity 180ms ease;
     will-change: left;
-    border-left: 1px solid var(--app-border-soft);
     background: #fafafa;
   }
 
@@ -1316,13 +1314,13 @@ button.primary {
   }
 
   .mobile-mode-editor .preview-pane {
-    left: calc(100% - var(--mobile-peek));
-    opacity: 0.88;
-    cursor: pointer;
+    left: 100%;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .mobile-mode-preview .preview-pane {
-    left: var(--mobile-peek);
+    left: 0;
     opacity: 1;
   }
 
@@ -1331,14 +1329,13 @@ button.primary {
     top: 0;
     bottom: 0;
     left: 0;
-    width: calc(100% - var(--mobile-peek));
+    width: 100%;
     height: 100%;
     padding: 12px;
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    border-right: 1px solid var(--app-border-soft);
     background: #ffffff;
     transition: left 180ms ease, opacity 180ms ease;
     will-change: left;
@@ -1350,34 +1347,27 @@ button.primary {
   }
 
   .mobile-mode-preview .editor-pane {
-    left: calc(-100% + var(--mobile-peek-double));
-    opacity: 0.9;
-    cursor: pointer;
+    left: -100%;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .markdown-toolbar {
-    position: fixed;
-    top: 60px;
-    left: 12px;
-    right: 12px;
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
     bottom: auto;
-    display: none;
+    display: flex;
+    flex: 0 0 auto;
     min-height: 48px;
-    margin: 0;
+    margin: 0 0 10px;
     overflow-x: auto;
     flex-wrap: nowrap;
     scrollbar-width: none;
-    z-index: 86;
+    z-index: 1;
     border-color: #d8d8d8;
-    box-shadow: 0 8px 14px rgba(0, 0, 0, 0.08);
-  }
-
-  .app-shell.is-mobile-editor-toolbar-visible .editor-pane {
-    padding-top: 72px;
-  }
-
-  .app-shell.is-mobile-editor-toolbar-visible .markdown-toolbar {
-    display: flex;
+    box-shadow: none;
   }
 
   .markdown-toolbar::-webkit-scrollbar {
@@ -1397,9 +1387,45 @@ button.primary {
 
   .editor-pane textarea {
     flex: 1;
+    min-height: 0;
     padding: 14px;
     font-size: 16px;
     line-height: 1.65;
+  }
+
+  .mobile-page-switch {
+    position: absolute;
+    top: 50%;
+    z-index: 70;
+    display: inline-flex;
+    width: 34px;
+    height: 64px;
+    min-height: 0;
+    padding: 0;
+    border-color: var(--app-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #202020;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
+  }
+
+  .mobile-page-switch-to-preview {
+    right: max(8px, env(safe-area-inset-right));
+    transform: translateY(-50%);
+  }
+
+  .mobile-page-switch-to-editor {
+    left: max(8px, env(safe-area-inset-left));
+    transform: translateY(-50%);
+  }
+
+  .mobile-page-switch:active:not(:disabled) {
+    transform: translateY(calc(-50% + 1px));
+  }
+
+  .mobile-mode-editor .mobile-page-switch-to-editor,
+  .mobile-mode-preview .mobile-page-switch-to-preview {
+    display: none;
   }
 
   .mobile-template-list {

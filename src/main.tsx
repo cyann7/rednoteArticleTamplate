@@ -291,7 +291,6 @@ function App() {
   const [mobileMode, setMobileMode] = useState<MobileMode>("editor");
   const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-  const [isMobileEditorToolbarVisible, setIsMobileEditorToolbarVisible] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const phoneFrameRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -305,6 +304,8 @@ function App() {
   const workspaceGestureRef = useRef<{ x: number; y: number; mode: MobileMode } | null>(null);
   const suppressNextWorkspaceClickRef = useRef(false);
   const previewSyncFrameRef = useRef<number | null>(null);
+  const mobilePreviewScrollTopRef = useRef(0);
+  const mobileEditorScrollTopRef = useRef(0);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingImageSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const preserveActiveBlockOnEditorFocusRef = useRef(false);
@@ -557,40 +558,6 @@ function App() {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [isExportMenuOpen]);
 
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-    const updateKeyboardOffset = () => {
-      const viewport = window.visualViewport;
-      const editor = markdownTextareaRef.current;
-      const isEditorFocused = document.activeElement === editor;
-      const isMobileWidth = window.matchMedia("(max-width: 960px)").matches;
-      const offset = viewport && isEditorFocused && isMobileWidth
-        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-        : 0;
-      setIsMobileEditorToolbarVisible(isEditorFocused && isMobileWidth && offset > 24);
-      root.style.setProperty("--keyboard-offset", `${Math.round(offset)}px`);
-    };
-    const handleFocusOut = () => {
-      window.setTimeout(updateKeyboardOffset, 80);
-    };
-
-    updateKeyboardOffset();
-    window.visualViewport?.addEventListener("resize", updateKeyboardOffset);
-    window.visualViewport?.addEventListener("scroll", updateKeyboardOffset);
-    window.addEventListener("resize", updateKeyboardOffset);
-    document.addEventListener("focusin", updateKeyboardOffset);
-    document.addEventListener("focusout", handleFocusOut);
-    return () => {
-      setIsMobileEditorToolbarVisible(false);
-      root.style.removeProperty("--keyboard-offset");
-      window.visualViewport?.removeEventListener("resize", updateKeyboardOffset);
-      window.visualViewport?.removeEventListener("scroll", updateKeyboardOffset);
-      window.removeEventListener("resize", updateKeyboardOffset);
-      document.removeEventListener("focusin", updateKeyboardOffset);
-      document.removeEventListener("focusout", handleFocusOut);
-    };
-  }, []);
-
   function pushUndoSnapshot(current: string) {
     setUndoStack((items) => [current, ...items].slice(0, 50));
     setRedoStack([]);
@@ -614,6 +581,7 @@ function App() {
 
   function schedulePreviewSync(blockId: string) {
     if (!isMobileViewport()) return;
+    if (mobileMode !== "preview") return;
     if (previewSyncFrameRef.current != null) window.cancelAnimationFrame(previewSyncFrameRef.current);
     previewSyncFrameRef.current = window.requestAnimationFrame(() => {
       previewSyncFrameRef.current = null;
@@ -633,23 +601,57 @@ function App() {
     return block.id;
   }
 
+  function saveMobileScrollPosition(mode: MobileMode = mobileMode) {
+    if (!isMobileViewport()) return;
+    if (mode === "preview") {
+      mobilePreviewScrollTopRef.current = previewPaneRef.current?.scrollTop ?? mobilePreviewScrollTopRef.current;
+      return;
+    }
+    mobileEditorScrollTopRef.current = markdownTextareaRef.current?.scrollTop ?? mobileEditorScrollTopRef.current;
+  }
+
+  function restoreMobileScrollPosition(mode: MobileMode) {
+    if (!isMobileViewport()) return;
+    requestAnimationFrame(() => {
+      if (mode === "preview") {
+        if (previewPaneRef.current) previewPaneRef.current.scrollTop = mobilePreviewScrollTopRef.current;
+        return;
+      }
+      if (markdownTextareaRef.current) markdownTextareaRef.current.scrollTop = mobileEditorScrollTopRef.current;
+    });
+  }
+
   function switchMobileMode(nextMode: MobileMode) {
+    if (nextMode === mobileMode) return;
+    saveMobileScrollPosition();
     setIsTemplatePickerOpen(false);
     setIsMobileSettingsOpen(false);
     setIsExportMenuOpen(false);
 
     if (nextMode === "preview") {
-      updateActiveBlockFromEditorSelection();
+      updateActiveBlockFromEditorSelection({ scroll: false });
       markdownTextareaRef.current?.blur();
       setMobileMode("preview");
+      restoreMobileScrollPosition("preview");
       return;
     }
 
     setMobileMode("editor");
+    restoreMobileScrollPosition("editor");
   }
 
   function handleEditorSelectionChange() {
     updateActiveBlockFromEditorSelection();
+  }
+
+  function handlePreviewPaneScroll() {
+    if (!isMobileViewport()) return;
+    mobilePreviewScrollTopRef.current = previewPaneRef.current?.scrollTop ?? 0;
+  }
+
+  function handleEditorTextareaScroll() {
+    if (!isMobileViewport()) return;
+    mobileEditorScrollTopRef.current = markdownTextareaRef.current?.scrollTop ?? 0;
   }
 
   function handleMobileWorkspacePointerDown(event: React.PointerEvent<HTMLElement>) {
@@ -1086,7 +1088,7 @@ function App() {
   }
 
   return (
-    <div className={isMobileEditorToolbarVisible ? "app-shell is-mobile-editor-toolbar-visible" : "app-shell"}>
+    <div className="app-shell">
       <header className="topbar">
         <div className="brand" aria-label="Rednote Markdown Studio">
           <FileText size={20} aria-hidden="true" />
@@ -1230,6 +1232,7 @@ function App() {
           ref={previewPaneRef}
           aria-label="图片预览"
           onClickCapture={handlePreviewPaneClickCapture}
+          onScroll={handlePreviewPaneScroll}
         >
           <div className="preview-toolbar">
             <div className="template-picker preview-template-picker" ref={templatePickerRef}>
@@ -1392,6 +1395,25 @@ function App() {
           <button type="button" onClick={syncEditorToPreviewBlock} disabled={!activeBlockId} title="定位编辑器到当前预览内容" aria-label="定位编辑器到当前预览内容">↦</button>
         </div>
 
+        <button
+          type="button"
+          className="mobile-page-switch mobile-page-switch-to-preview"
+          onClick={() => switchMobileMode("preview")}
+          aria-label="切换到预览页"
+          title="预览"
+        >
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="mobile-page-switch mobile-page-switch-to-editor"
+          onClick={() => switchMobileMode("editor")}
+          aria-label="切换到编辑页"
+          title="编辑"
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
+
         <section className="editor-pane" aria-label="Markdown 编辑器" onClickCapture={handleEditorPaneClickCapture}>
           <MarkdownToolbar
             template={template}
@@ -1437,6 +1459,7 @@ function App() {
             onClick={handleEditorSelectionChange}
             onSelect={handleEditorSelectionChange}
             onFocus={handleEditorFocus}
+            onScroll={handleEditorTextareaScroll}
             spellCheck={false}
             aria-label="Markdown 内容"
           />
