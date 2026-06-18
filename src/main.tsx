@@ -291,6 +291,8 @@ function App() {
   const [mobileMode, setMobileMode] = useState<MobileMode>("editor");
   const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isMobileEditorFocused, setIsMobileEditorFocused] = useState(false);
+  const [isMobileEditorToolbarVisible, setIsMobileEditorToolbarVisible] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const phoneFrameRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -513,6 +515,76 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!isMobileEditorFocused || mobileMode !== "editor") {
+      setIsMobileEditorToolbarVisible(false);
+      return;
+    }
+
+    const editor = markdownTextareaRef.current;
+    if (!editor || !isMobileViewport()) {
+      setIsMobileEditorToolbarVisible(false);
+      return;
+    }
+
+    let disposed = false;
+    let stableTimer: number | null = null;
+    let maxWaitTimer: number | null = null;
+    const root = document.documentElement;
+    const toolbarInset = 12;
+    const earliestRevealAt = window.performance.now() + 650;
+
+    const updateToolbarPosition = () => {
+      const viewport = window.visualViewport;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const right = Math.max(toolbarInset, Math.round(window.innerWidth - viewportLeft - viewportWidth + toolbarInset));
+
+      root.style.setProperty("--mobile-toolbar-top", `${Math.round(viewportTop + 8)}px`);
+      root.style.setProperty("--mobile-toolbar-left", `${Math.round(viewportLeft + toolbarInset)}px`);
+      root.style.setProperty("--mobile-toolbar-right", `${right}px`);
+    };
+
+    const revealToolbar = () => {
+      if (disposed || document.activeElement !== editor || !isMobileViewport()) return;
+      const waitMs = earliestRevealAt - window.performance.now();
+      if (waitMs > 0) {
+        if (stableTimer != null) window.clearTimeout(stableTimer);
+        stableTimer = window.setTimeout(revealToolbar, waitMs);
+        return;
+      }
+      updateToolbarPosition();
+      setIsMobileEditorToolbarVisible(true);
+    };
+
+    const scheduleStableReveal = () => {
+      updateToolbarPosition();
+      if (stableTimer != null) window.clearTimeout(stableTimer);
+      stableTimer = window.setTimeout(revealToolbar, 180);
+    };
+
+    setIsMobileEditorToolbarVisible(false);
+    scheduleStableReveal();
+    maxWaitTimer = window.setTimeout(revealToolbar, 1000);
+
+    window.visualViewport?.addEventListener("resize", scheduleStableReveal);
+    window.visualViewport?.addEventListener("scroll", scheduleStableReveal);
+    window.addEventListener("resize", scheduleStableReveal);
+
+    return () => {
+      disposed = true;
+      if (stableTimer != null) window.clearTimeout(stableTimer);
+      if (maxWaitTimer != null) window.clearTimeout(maxWaitTimer);
+      window.visualViewport?.removeEventListener("resize", scheduleStableReveal);
+      window.visualViewport?.removeEventListener("scroll", scheduleStableReveal);
+      window.removeEventListener("resize", scheduleStableReveal);
+      root.style.removeProperty("--mobile-toolbar-top");
+      root.style.removeProperty("--mobile-toolbar-left");
+      root.style.removeProperty("--mobile-toolbar-right");
+    };
+  }, [isMobileEditorFocused, mobileMode]);
+
+  useEffect(() => {
     if (!isTemplatePickerOpen) return;
 
     const handlePointerDown = (event: PointerEvent) => {
@@ -630,6 +702,8 @@ function App() {
 
     if (nextMode === "preview") {
       updateActiveBlockFromEditorSelection({ scroll: false });
+      setIsMobileEditorFocused(false);
+      setIsMobileEditorToolbarVisible(false);
       markdownTextareaRef.current?.blur();
       setMobileMode("preview");
       restoreMobileScrollPosition("preview");
@@ -729,11 +803,30 @@ function App() {
   }
 
   function handleEditorFocus() {
+    if (isMobileViewport() && mobileMode === "editor") {
+      setIsMobileEditorFocused(true);
+    }
     if (preserveActiveBlockOnEditorFocusRef.current) {
       preserveActiveBlockOnEditorFocusRef.current = false;
       return;
     }
     updateActiveBlockFromEditorSelection();
+  }
+
+  function handleEditorBlur() {
+    if (!isMobileViewport()) return;
+    window.setTimeout(() => {
+      if (document.activeElement !== markdownTextareaRef.current) {
+        setIsMobileEditorFocused(false);
+        setIsMobileEditorToolbarVisible(false);
+      }
+    }, 80);
+  }
+
+  function handleMarkdownToolbarPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!isMobileViewport()) return;
+    event.preventDefault();
+    markdownTextareaRef.current?.focus({ preventScroll: true });
   }
 
   function updateImageOptions(blockId: string, patch: Partial<ImageOptions>) {
@@ -1088,7 +1181,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={isMobileEditorToolbarVisible ? "app-shell is-mobile-editor-toolbar-visible" : "app-shell"}>
       <header className="topbar">
         <div className="brand" aria-label="Rednote Markdown Studio">
           <FileText size={20} aria-hidden="true" />
@@ -1440,6 +1533,7 @@ function App() {
             onCodeBlock={applyCodeBlock}
             onDivider={insertDivider}
             onImage={openImagePicker}
+            onPointerDown={handleMarkdownToolbarPointerDown}
           />
           <input
             ref={imageInputRef}
@@ -1459,6 +1553,7 @@ function App() {
             onClick={handleEditorSelectionChange}
             onSelect={handleEditorSelectionChange}
             onFocus={handleEditorFocus}
+            onBlur={handleEditorBlur}
             onScroll={handleEditorTextareaScroll}
             spellCheck={false}
             aria-label="Markdown 内容"
@@ -2088,7 +2183,8 @@ function MarkdownToolbar({
   onUnorderedList,
   onCodeBlock,
   onDivider,
-  onImage
+  onImage,
+  onPointerDown
 }: {
   template: TemplateDefinition;
   undo: () => void;
@@ -2114,6 +2210,7 @@ function MarkdownToolbar({
   onCodeBlock: () => void;
   onDivider: () => void;
   onImage: () => void;
+  onPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   const hasHeadingTools = [1, 2, 3, 4, 5, 6].some((level) => templateSupportsHeadingLevel(template, level as HeadingLevel));
   const hasInlineTools = ["bold", "highlight", "italic", "strike", "underline", "code", "link"].some((format) => (
@@ -2124,7 +2221,7 @@ function MarkdownToolbar({
   ));
 
   return (
-    <div className="markdown-toolbar" aria-label="Markdown 格式工具栏">
+    <div className="markdown-toolbar" aria-label="Markdown 格式工具栏" onPointerDown={onPointerDown}>
       {templateSupportsHeadingLevel(template, 1) && (
         <button type="button" onClick={onHeading1} title="一级标题 Cmd/Ctrl+Shift+1" aria-label="设置一级标题">
           <Heading1 size={16} />

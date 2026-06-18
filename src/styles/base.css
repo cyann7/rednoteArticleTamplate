@@ -1353,21 +1353,24 @@ button.primary {
   }
 
   .markdown-toolbar {
-    position: relative;
-    top: auto;
-    left: auto;
-    right: auto;
+    position: fixed;
+    top: var(--mobile-toolbar-top, 8px);
+    left: var(--mobile-toolbar-left, 12px);
+    right: var(--mobile-toolbar-right, 12px);
     bottom: auto;
-    display: flex;
-    flex: 0 0 auto;
+    display: none;
     min-height: 48px;
-    margin: 0 0 10px;
+    margin: 0;
     overflow-x: auto;
     flex-wrap: nowrap;
     scrollbar-width: none;
-    z-index: 1;
+    z-index: 86;
     border-color: #d8d8d8;
-    box-shadow: none;
+    box-shadow: 0 8px 14px rgba(0, 0, 0, 0.12);
+  }
+
+  .app-shell.is-mobile-editor-toolbar-visible .markdown-toolbar {
+    display: flex;
   }
 
   .markdown-toolbar::-webkit-scrollbar {
