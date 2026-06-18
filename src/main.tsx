@@ -304,6 +304,7 @@ function App() {
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
   const workspaceGestureRef = useRef<{ x: number; y: number; mode: MobileMode } | null>(null);
   const suppressNextWorkspaceClickRef = useRef(false);
+  const previewSyncFrameRef = useRef<number | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingImageSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const preserveActiveBlockOnEditorFocusRef = useRef(false);
@@ -506,6 +507,7 @@ function App() {
   useEffect(() => {
     return () => {
       if (highlightTimerRef.current != null) window.clearTimeout(highlightTimerRef.current);
+      if (previewSyncFrameRef.current != null) window.cancelAnimationFrame(previewSyncFrameRef.current);
     };
   }, []);
 
@@ -594,9 +596,15 @@ function App() {
     setRedoStack([]);
   }
 
-  function handleMarkdownChange(value: string) {
+  function handleMarkdownChange(value: string, selectionStart?: number) {
     pushUndoSnapshot(markdown);
-    setActiveBlockId(null);
+    const block = typeof selectionStart === "number" ? findBlockAtOffset(blocks, selectionStart, markdown) : null;
+    if (block) {
+      setActiveBlockId(block.id);
+      schedulePreviewSync(block.id);
+    } else {
+      setActiveBlockId(null);
+    }
     setMarkdown(value);
   }
 
@@ -604,14 +612,23 @@ function App() {
     return window.matchMedia("(max-width: 960px)").matches;
   }
 
-  function updateActiveBlockFromEditorSelection({ scroll = false } = {}) {
+  function schedulePreviewSync(blockId: string) {
+    if (!isMobileViewport()) return;
+    if (previewSyncFrameRef.current != null) window.cancelAnimationFrame(previewSyncFrameRef.current);
+    previewSyncFrameRef.current = window.requestAnimationFrame(() => {
+      previewSyncFrameRef.current = null;
+      scrollPreviewBlockIntoView(blockId, { behavior: "auto", flash: false });
+    });
+  }
+
+  function updateActiveBlockFromEditorSelection({ scroll = true } = {}) {
     const textarea = markdownTextareaRef.current;
     if (!textarea) return activeBlockId;
     const block = findBlockAtOffset(blocks, textarea.selectionStart, markdown);
     if (!block) return null;
     setActiveBlockId(block.id);
     if (scroll) {
-      requestAnimationFrame(() => scrollPreviewBlockIntoView(block.id));
+      schedulePreviewSync(block.id);
     }
     return block.id;
   }
@@ -622,15 +639,9 @@ function App() {
     setIsExportMenuOpen(false);
 
     if (nextMode === "preview") {
-      const blockId = updateActiveBlockFromEditorSelection();
+      updateActiveBlockFromEditorSelection();
       markdownTextareaRef.current?.blur();
       setMobileMode("preview");
-      const targetBlockId = blockId || activeBlockId;
-      if (targetBlockId) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => scrollPreviewBlockIntoView(targetBlockId));
-        });
-      }
       return;
     }
 
@@ -657,7 +668,7 @@ function App() {
 
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    if (Math.abs(dx) < 34 || Math.abs(dx) < Math.abs(dy) * 0.75) return;
 
     suppressNextWorkspaceClickRef.current = true;
     switchMobileMode(start.mode === "editor" ? "preview" : "editor");
@@ -704,6 +715,10 @@ function App() {
 
   function handlePreviewBlockClick(blockId: string) {
     setActiveBlockId(blockId);
+    if (isMobileViewport()) {
+      flashPreviewBlock(blockId);
+      return;
+    }
     preserveActiveBlockOnEditorFocusRef.current = true;
     focusEditorBlock(blockId);
     flashPreviewBlock(blockId);
@@ -744,7 +759,7 @@ function App() {
     textarea.scrollTop = getTextareaScrollTopForOffset(textarea, markdown, range.start);
   }
 
-  function scrollPreviewBlockIntoView(blockId: string) {
+  function scrollPreviewBlockIntoView(blockId: string, options: { behavior?: ScrollBehavior; flash?: boolean } = {}) {
     const pane = previewPaneRef.current;
     if (!pane) return;
     const element = pane.querySelector<HTMLElement>(`[data-source-block-id="${blockId}"]`);
@@ -753,9 +768,9 @@ function App() {
     const elementRect = element.getBoundingClientRect();
     pane.scrollTo({
       top: pane.scrollTop + elementRect.top - paneRect.top - pane.clientHeight * 0.28,
-      behavior: "smooth"
+      behavior: options.behavior ?? "smooth"
     });
-    flashPreviewBlock(blockId);
+    if (options.flash ?? true) flashPreviewBlock(blockId);
   }
 
   function flashPreviewBlock(blockId: string) {
@@ -1193,23 +1208,6 @@ function App() {
         </div>
       </header>
 
-      <nav className="mobile-mode-switcher" aria-label="移动端工作模式">
-        {([
-          ["editor", "编辑"],
-          ["preview", "预览"]
-        ] as const).map(([mode, label]) => (
-          <button
-            key={mode}
-            type="button"
-            className={mobileMode === mode ? "is-active" : ""}
-            aria-pressed={mobileMode === mode}
-            onClick={() => switchMobileMode(mode)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-
       <div
         ref={measureRef}
         className={`pagination-measurer ${template.canvasClassName}`}
@@ -1433,7 +1431,7 @@ function App() {
           <textarea
             ref={markdownTextareaRef}
             value={markdown}
-            onChange={(event) => handleMarkdownChange(event.target.value)}
+            onChange={(event) => handleMarkdownChange(event.target.value, event.target.selectionStart)}
             onKeyDown={handleEditorKeyDown}
             onKeyUp={handleEditorSelectionChange}
             onClick={handleEditorSelectionChange}

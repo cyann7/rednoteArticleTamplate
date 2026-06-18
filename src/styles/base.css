@@ -130,7 +130,6 @@ button.primary {
 
 .mobile-template-picker,
 .mobile-settings-button,
-.mobile-mode-switcher,
 .mobile-settings-menu,
 .mobile-preview-actions {
   display: none;
@@ -1274,32 +1273,6 @@ button.primary {
     z-index: 82;
   }
 
-  .mobile-mode-switcher {
-    flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--app-border);
-    background: #ffffff;
-  }
-
-  .mobile-mode-switcher button {
-    height: 36px;
-    border-color: transparent;
-    border-radius: 8px;
-    background: transparent;
-    color: #555555;
-    font-size: 14px;
-    font-weight: 700;
-  }
-
-  .mobile-mode-switcher button.is-active {
-    border-color: #d8d8d8;
-    background: #f7f7f7;
-    color: #171717;
-  }
-
   .workspace {
     --mobile-peek: 38px;
     --mobile-peek-double: 76px;
@@ -1384,9 +1357,10 @@ button.primary {
 
   .markdown-toolbar {
     position: fixed;
+    top: 60px;
     left: 12px;
     right: 12px;
-    bottom: calc(var(--keyboard-offset, 0px) + max(8px, env(safe-area-inset-bottom)));
+    bottom: auto;
     display: none;
     min-height: 48px;
     margin: 0;
@@ -1394,11 +1368,12 @@ button.primary {
     flex-wrap: nowrap;
     scrollbar-width: none;
     z-index: 86;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+    border-color: #d8d8d8;
+    box-shadow: 0 8px 14px rgba(0, 0, 0, 0.08);
   }
 
   .app-shell.is-mobile-editor-toolbar-visible .editor-pane {
-    padding-bottom: 72px;
+    padding-top: 72px;
   }
 
   .app-shell.is-mobile-editor-toolbar-visible .markdown-toolbar {
@@ -1425,10 +1400,6 @@ button.primary {
     padding: 14px;
     font-size: 16px;
     line-height: 1.65;
-  }
-
-  .app-shell.is-mobile-editor-toolbar-visible .editor-pane textarea {
-    padding-bottom: 84px;
   }
 
   .mobile-template-list {

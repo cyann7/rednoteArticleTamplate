@@ -95,7 +95,7 @@
       {
         "name": "desktop-lock",
         "value": "1180px",
-        "purpose": "Desktop-to-mobile adaptation point. Below this, the app shifts from split-pane editing into Edit and Preview pages, with template choice and flat settings controls in the topbar."
+        "purpose": "Desktop-to-mobile adaptation point. Below this, the app shifts from split-pane editing into adjacent Edit and Preview pages with edge peeks, swipe switching, topbar template choice, and flat settings controls."
       }
     ]
   },
@@ -174,8 +174,9 @@
       "Template-specific visual systems scoped under their own canvas class.",
       "Preview accuracy is treated as part of the interface, not a secondary output.",
       "Preview pagination uses a fixed 500px logical canvas and viewport changes only scale the visual result.",
-      "Mobile uses Edit and Preview pages instead of shrinking the desktop split pane.",
-      "Mobile editor formatting controls track the visual viewport and sit above the software keyboard.",
+      "Mobile uses adjacent Edit and Preview pages with edge peeks instead of shrinking the desktop split pane.",
+      "Mobile editor formatting controls appear below the topbar only while the software keyboard is open.",
+      "Mobile editor cursor movement continuously syncs the corresponding preview card before page switching.",
       "Mobile template choice is separate from Settings, and Settings uses a flat menu of direct controls.",
       "Export opens a compact menu with image downloads and ZIP download.",
       "Mobile export belongs to Preview as a floating round icon button.",
