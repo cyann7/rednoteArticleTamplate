@@ -637,13 +637,7 @@ function App() {
 
   function handleMarkdownChange(value: string, selectionStart?: number) {
     pushUndoSnapshot(markdown);
-    const block = typeof selectionStart === "number" ? findBlockAtOffset(blocks, selectionStart, markdown) : null;
-    if (block) {
-      setActiveBlockId(block.id);
-      schedulePreviewSync(block.id);
-    } else {
-      setActiveBlockId(null);
-    }
+    syncEditorSelectionToPreview(value, selectionStart);
     setMarkdown(value);
   }
 
@@ -651,14 +645,27 @@ function App() {
     return window.matchMedia("(max-width: 960px)").matches;
   }
 
-  function schedulePreviewSync(blockId: string) {
-    if (!isMobileViewport()) return;
-    if (mobileMode !== "preview") return;
+  function schedulePreviewSync(blockId: string, options: { behavior?: ScrollBehavior; flash?: boolean; force?: boolean } = {}) {
     if (previewSyncFrameRef.current != null) window.cancelAnimationFrame(previewSyncFrameRef.current);
     previewSyncFrameRef.current = window.requestAnimationFrame(() => {
-      previewSyncFrameRef.current = null;
-      scrollPreviewBlockIntoView(blockId, { behavior: "auto", flash: false });
+      previewSyncFrameRef.current = window.requestAnimationFrame(() => {
+        previewSyncFrameRef.current = null;
+        ensurePreviewBlockVisible(blockId, options);
+      });
     });
+  }
+
+  function syncEditorSelectionToPreview(source: string, selectionStart?: number) {
+    const nextBlocks = parseMarkdown(source);
+    const block = typeof selectionStart === "number" ? findBlockAtOffset(nextBlocks, selectionStart, source) : null;
+    if (!block) {
+      setActiveBlockId(null);
+      return null;
+    }
+
+    setActiveBlockId(block.id);
+    schedulePreviewSync(block.id, { behavior: "auto", flash: false });
+    return block;
   }
 
   function updateActiveBlockFromEditorSelection({ scroll = true } = {}) {
@@ -668,7 +675,7 @@ function App() {
     if (!block) return null;
     setActiveBlockId(block.id);
     if (scroll) {
-      schedulePreviewSync(block.id);
+      schedulePreviewSync(block.id, { behavior: "auto", flash: false });
     }
     return block.id;
   }
@@ -828,7 +835,6 @@ function App() {
   }
 
   function handleMarkdownToolbarPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (!isMobileViewport()) return;
     event.preventDefault();
     markdownTextareaRef.current?.focus({ preventScroll: true });
   }
@@ -843,6 +849,7 @@ function App() {
     pushUndoSnapshot(markdown);
     setMarkdown(`${markdown.slice(0, range.start)}${replacement}${markdown.slice(range.end)}`);
     setActiveBlockId(blockId);
+    schedulePreviewSync(blockId, { behavior: "auto", flash: false });
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event("rednote:layout-change"));
     });
@@ -858,17 +865,31 @@ function App() {
     textarea.scrollTop = getTextareaScrollTopForOffset(textarea, markdown, range.start);
   }
 
-  function scrollPreviewBlockIntoView(blockId: string, options: { behavior?: ScrollBehavior; flash?: boolean } = {}) {
+  function scrollPreviewBlockIntoView(blockId: string, options: { behavior?: ScrollBehavior; flash?: boolean; force?: boolean } = {}) {
+    ensurePreviewBlockVisible(blockId, { ...options, force: true });
+  }
+
+  function ensurePreviewBlockVisible(blockId: string, options: { behavior?: ScrollBehavior; flash?: boolean; force?: boolean } = {}) {
     const pane = previewPaneRef.current;
     if (!pane) return;
-    const element = pane.querySelector<HTMLElement>(`[data-source-block-id="${blockId}"]`);
+    const elements = Array.from(pane.querySelectorAll<HTMLElement>(`[data-source-block-id="${blockId}"]`));
+    const element = getBestPreviewTarget(pane, elements);
     if (!element) return;
     const paneRect = pane.getBoundingClientRect();
     const elementRect = element.getBoundingClientRect();
+
+    if (!options.force && elements.some((item) => isPreviewElementVisible(pane, item))) {
+      if (options.flash ?? false) flashPreviewBlock(blockId);
+      return;
+    }
+
     pane.scrollTo({
       top: pane.scrollTop + elementRect.top - paneRect.top - pane.clientHeight * 0.28,
-      behavior: options.behavior ?? "smooth"
+      behavior: options.behavior ?? "auto"
     });
+    if (isMobileViewport()) {
+      mobilePreviewScrollTopRef.current = pane.scrollTop;
+    }
     if (options.flash ?? true) flashPreviewBlock(blockId);
   }
 
@@ -886,12 +907,14 @@ function App() {
 
   function replaceMarkdownSelection(next: string, selectionStart: number, selectionEnd: number) {
     pushUndoSnapshot(markdown);
+    syncEditorSelectionToPreview(next, selectionStart);
     setMarkdown(next);
     requestAnimationFrame(() => {
       const textarea = markdownTextareaRef.current;
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(selectionStart, selectionEnd);
+      if (textarea) {
+        textarea.focus({ preventScroll: true });
+        textarea.setSelectionRange(selectionStart, selectionEnd);
+      }
     });
   }
 
@@ -1080,7 +1103,9 @@ function App() {
   function undo() {
     const [previous, ...rest] = undoStack;
     if (!previous) return;
+    const selectionStart = markdownTextareaRef.current?.selectionStart ?? 0;
     setRedoStack((items) => [markdown, ...items].slice(0, 50));
+    syncEditorSelectionToPreview(previous, Math.min(selectionStart, previous.length));
     setMarkdown(previous);
     setUndoStack(rest);
   }
@@ -1088,7 +1113,9 @@ function App() {
   function redo() {
     const [next, ...rest] = redoStack;
     if (!next) return;
+    const selectionStart = markdownTextareaRef.current?.selectionStart ?? 0;
     setUndoStack((items) => [markdown, ...items].slice(0, 50));
+    syncEditorSelectionToPreview(next, Math.min(selectionStart, next.length));
     setMarkdown(next);
     setRedoStack(rest);
   }
@@ -1112,9 +1139,53 @@ function App() {
     });
   }
 
+  function clearPreviewFocusArtifacts() {
+    if (previewSyncFrameRef.current != null) {
+      window.cancelAnimationFrame(previewSyncFrameRef.current);
+      previewSyncFrameRef.current = null;
+    }
+    if (highlightTimerRef.current != null) {
+      window.clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement) {
+      focused.blur();
+    }
+
+    canvasRef.current?.querySelectorAll(".is-sync-active, .is-sync-highlight").forEach((node) => {
+      node.classList.remove("is-sync-active", "is-sync-highlight");
+    });
+  }
+
+  async function prepareExportSurface() {
+    clearPreviewFocusArtifacts();
+    flushSync(() => {
+      setActiveBlockId(null);
+      setFloatingImageControls(null);
+      setIsMobileEditorFocused(false);
+      setIsMobileEditorToolbarVisible(false);
+      setIsTemplatePickerOpen(false);
+      setIsMobileSettingsOpen(false);
+      setIsExportMenuOpen(false);
+    });
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        clearPreviewFocusArtifacts();
+        requestAnimationFrame(() => {
+          clearPreviewFocusArtifacts();
+          resolve();
+        });
+      });
+    });
+  }
+
   async function renderExportFiles() {
     if (!canvasRef.current) return [];
     await document.fonts.ready;
+    await prepareExportSurface();
     const cards = Array.from(canvasRef.current.querySelectorAll<HTMLElement>(".preview-page-card"));
     const files: ZipFile[] = [];
     for (let page = 0; page < cards.length; page += 1) {
@@ -1633,6 +1704,28 @@ function getBlockSourceRange(source: string, block: MarkdownBlock) {
     if (index < block.endLine) end += 1;
   }
   return { start, end };
+}
+
+function getBestPreviewTarget(pane: HTMLElement, elements: HTMLElement[]) {
+  if (!elements.length) return null;
+
+  const paneRect = pane.getBoundingClientRect();
+  const viewportCenter = paneRect.top + pane.clientHeight / 2;
+  return elements.reduce((best, element) => {
+    const bestRect = best.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    const bestCenter = bestRect.top + bestRect.height / 2;
+    const elementCenter = elementRect.top + elementRect.height / 2;
+    return Math.abs(elementCenter - viewportCenter) < Math.abs(bestCenter - viewportCenter) ? element : best;
+  });
+}
+
+function isPreviewElementVisible(pane: HTMLElement, element: HTMLElement) {
+  const paneRect = pane.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  const visibleTop = Math.max(paneRect.top, elementRect.top);
+  const visibleBottom = Math.min(paneRect.bottom, elementRect.bottom);
+  return visibleBottom - visibleTop > 8;
 }
 
 function getTextareaScrollTopForOffset(textarea: HTMLTextAreaElement, source: string, offset: number) {

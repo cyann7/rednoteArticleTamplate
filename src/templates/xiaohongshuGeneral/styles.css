@@ -108,7 +108,11 @@
 }
 
 .template-xiaohongshu .markdown-text u {
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-thickness: 1px;
   text-decoration-color: #b9473b;
+  text-underline-offset: 3px;
 }
 
 .template-xiaohongshu .block-quote {
