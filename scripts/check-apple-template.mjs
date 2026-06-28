@@ -5,6 +5,7 @@ const root = process.cwd();
 const templatesIndex = readFileSync(join(root, "src/templates/index.ts"), "utf8");
 const appleTemplate = readFileSync(join(root, "src/templates/appleModern/index.ts"), "utf8");
 const appleContentTemplate = readFileSync(join(root, "src/templates/appleModern/contentTemplate.ts"), "utf8");
+const techShareContentTemplate = readFileSync(join(root, "src/templates/techShareLight/contentTemplate.ts"), "utf8");
 const markdown = readFileSync(join(root, "src/markdown.ts"), "utf8");
 
 const failures = [];
@@ -52,7 +53,7 @@ expect(templatesIndex.includes('import: "template"'), 'template discovery should
 expect(appleTemplate.includes('id: "apple-modern"'), "apple-modern template definition is missing");
 expect(!templatesIndex.includes('"template-apple"') && !appleTemplate.includes('"template-apple"'), "legacy template-apple key should not return");
 expect(styles.includes(".template-apple-modern"), "template-apple-modern CSS is missing");
-expect(!/[—–]/.test(styles + templatesIndex + appleTemplate + appleContentTemplate + markdown), "visible template copy must not use em or en dashes");
+expect(!/[—–]/.test(styles + templatesIndex + appleTemplate + appleContentTemplate + techShareContentTemplate + markdown), "visible template copy must not use em or en dashes");
 
 const pageBlock = cssBlock(".template-apple-modern,\n.preview-page-card.template-apple-modern");
 expect(pageBlock.includes("background: #ffffff;"), "Apple page canvas should use a bright white background");
@@ -75,7 +76,10 @@ expect(listBlock.includes("border-radius: 0;"), "Lists should not use rounded ca
 expect(listBlock.includes("box-shadow: none;"), "Lists should not use card shadows");
 expect(quoteBlock.includes("background: transparent;"), "Quotes should not use card backgrounds");
 expect(/border-radius:\s*2[468]px/.test(imageBlock), "Image cards should use Apple Store style rounded cards");
-expect(appleContentTemplate.includes("![内容创作工作台](/apple-writing-studio.svg){size=large}"), "Apple template content template should include the local Apple-style image");
+expect(!/!\[/.test(appleContentTemplate), "Apple template content template should not include default images");
+expect(!/!\[/.test(techShareContentTemplate), "Tech share content template should not include default images");
+expect(!appleContentTemplate.includes("/apple-writing-studio.svg"), "Apple template content template should not reference the sample image");
+expect(!techShareContentTemplate.includes("/apple-writing-studio.svg"), "Tech share content template should not reference the sample image");
 
 if (failures.length > 0) {
   console.error("Apple template checks failed:");
