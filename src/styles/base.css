@@ -35,12 +35,14 @@ html,
 
 button,
 select,
+input,
 textarea {
   font: inherit;
 }
 
 button,
-select {
+select,
+input {
   border: 1px solid var(--app-border);
   background: #ffffff;
   color: var(--app-text);
@@ -59,7 +61,8 @@ button {
 }
 
 button:hover:not(:disabled),
-select:hover {
+select:hover,
+input:hover {
   border-color: #9d9d9d;
   background: #f7f7f7;
 }
@@ -69,7 +72,8 @@ button:active:not(:disabled) {
 }
 
 button:focus-visible,
-select:focus-visible {
+select:focus-visible,
+input:focus-visible {
   outline: none;
   border-color: #777777;
   box-shadow: 0 0 0 3px var(--app-focus);
@@ -147,6 +151,90 @@ button.primary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.custom-size-control {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.custom-size-button {
+  min-width: 112px;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.custom-size-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--app-text);
+}
+
+.desktop-custom-size-control .custom-size-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 82;
+  width: 276px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+.custom-size-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.custom-size-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.custom-size-grid span {
+  color: #4f4f4f;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.custom-size-grid input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.custom-size-note {
+  margin: 0;
+  min-height: 18px;
+  color: #666666;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.custom-size-note.is-error {
+  color: #8f2f25;
+}
+
+.custom-size-save {
+  width: 100%;
+  justify-content: center;
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.custom-size-save:hover:not(:disabled) {
+  border-color: #303030;
+  background: #303030;
 }
 
 .template-picker {
@@ -1168,6 +1256,10 @@ button.primary {
     display: none;
   }
 
+  .desktop-custom-size-control {
+    display: none;
+  }
+
   .mobile-template-picker {
     position: relative;
     display: block;
@@ -1213,7 +1305,7 @@ button.primary {
 
   .mobile-ratio-options {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
     gap: 6px;
   }
 
@@ -1228,6 +1320,10 @@ button.primary {
     border-color: #bdbdbd;
     background: #171717;
     color: #ffffff;
+  }
+
+  .custom-size-panel-mobile {
+    box-shadow: none;
   }
 
   .mobile-setting-stepper {

@@ -36,11 +36,29 @@ import type { TemplateDefinition, TemplateRenderUnit } from "./templates";
 import { DEFAULT_TEMPLATE_ID, type HeadingLevel, type ImageOptions, type ImageSize, type InlineFormatKind, type MarkdownBlock, type PageNumberConfig, type RatioId, type TemplateId } from "./types";
 import "./styles.css";
 
-const ratioMap: Record<RatioId, { width: number; height: number }> = {
+type CanvasDimensions = {
+  width: number;
+  height: number;
+};
+
+type FixedRatioId = Exclude<RatioId, "custom">;
+
+const ratioMap: Record<FixedRatioId, CanvasDimensions> = {
   "9:16": { width: 1080, height: 1920 },
   "3:4": { width: 1080, height: 1440 },
   "1:1": { width: 1080, height: 1080 },
   full: { width: 1080, height: 0 }
+};
+
+const customSizeStoreKey = "rednote.customSize.v1";
+const defaultCustomSize: CanvasDimensions = { width: 1080, height: 1350 };
+const customSizeLimits = {
+  minWidth: 720,
+  maxWidth: 2160,
+  minHeight: 720,
+  maxHeight: 3840,
+  minHeightRatio: 0.75,
+  maxHeightRatio: 2.4
 };
 
 const previewDesignWidthPx = 500;
@@ -126,7 +144,81 @@ function getSavedTemplateId() {
 function getSavedRatio() {
   const saved = localStorage.getItem("rednote.ratio.v2") as RatioId | null;
 
-  return saved && saved in ratioMap ? saved : "3:4";
+  return saved && (saved === "custom" || saved in ratioMap) ? saved : "3:4";
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function normalizeDimension(value: unknown, fallback: number) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? Math.round(number) : fallback;
+}
+
+function normalizeCustomSize(size: Partial<CanvasDimensions> = defaultCustomSize): CanvasDimensions {
+  const width = clampNumber(
+    normalizeDimension(size.width, defaultCustomSize.width),
+    customSizeLimits.minWidth,
+    customSizeLimits.maxWidth
+  );
+  let height = clampNumber(
+    normalizeDimension(size.height, defaultCustomSize.height),
+    customSizeLimits.minHeight,
+    customSizeLimits.maxHeight
+  );
+  height = clampNumber(
+    height,
+    Math.ceil(width * customSizeLimits.minHeightRatio),
+    Math.floor(width * customSizeLimits.maxHeightRatio)
+  );
+
+  return { width, height };
+}
+
+function readSavedCustomSize(): CanvasDimensions {
+  try {
+    const saved = localStorage.getItem(customSizeStoreKey);
+    if (!saved) return defaultCustomSize;
+    return normalizeCustomSize(JSON.parse(saved) as Partial<CanvasDimensions>);
+  } catch {
+    return defaultCustomSize;
+  }
+}
+
+function getCanvasDimensions(ratio: RatioId, customSize: CanvasDimensions): CanvasDimensions {
+  return ratio === "custom" ? customSize : ratioMap[ratio];
+}
+
+function formatDimensions(size: CanvasDimensions) {
+  return `${size.width}×${size.height}`;
+}
+
+function getCustomSizeDraft(widthText: string, heightText: string) {
+  const width = Number(widthText);
+  const height = Number(heightText);
+  if (!Number.isInteger(width) || !Number.isInteger(height)) {
+    return { size: null, error: "请输入完整的整数尺寸。" };
+  }
+  if (
+    width < customSizeLimits.minWidth ||
+    width > customSizeLimits.maxWidth ||
+    height < customSizeLimits.minHeight ||
+    height > customSizeLimits.maxHeight
+  ) {
+    return {
+      size: null,
+      error: `宽度 ${customSizeLimits.minWidth}-${customSizeLimits.maxWidth}px，高度 ${customSizeLimits.minHeight}-${customSizeLimits.maxHeight}px。`
+    };
+  }
+  const heightRatio = height / width;
+  if (heightRatio < customSizeLimits.minHeightRatio || heightRatio > customSizeLimits.maxHeightRatio) {
+    return {
+      size: null,
+      error: `高度/宽度需在 ${customSizeLimits.minHeightRatio} 到 ${customSizeLimits.maxHeightRatio} 之间。`
+    };
+  }
+  return { size: { width, height }, error: "" };
 }
 
 function getInlineFormat(before: string, after: string): InlineFormat {
@@ -284,6 +376,8 @@ function App() {
   const [templateId, setTemplateId] = useState<TemplateId>(getSavedTemplateId);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [ratio, setRatio] = useState<RatioId>(getSavedRatio);
+  const [customSize, setCustomSize] = useState<CanvasDimensions>(readSavedCustomSize);
+  const [isCustomSizeMenuOpen, setIsCustomSizeMenuOpen] = useState(false);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -300,6 +394,7 @@ function App() {
   const templatePickerRef = useRef<HTMLDivElement>(null);
   const mobileTemplatePickerRef = useRef<HTMLDivElement>(null);
   const mobileSettingsRef = useRef<HTMLDivElement>(null);
+  const customSizeControlRef = useRef<HTMLDivElement>(null);
   const desktopExportRef = useRef<HTMLDivElement>(null);
   const mobileExportRef = useRef<HTMLDivElement>(null);
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -321,7 +416,7 @@ function App() {
   const highlightTimerRef = useRef<number | null>(null);
 
   const blocks = useMemo(() => parseMarkdown(markdown), [markdown]);
-  const dimensions = ratioMap[ratio];
+  const dimensions = getCanvasDimensions(ratio, customSize);
   const isFullRatio = ratio === "full";
   const pageHeightPx = isFullRatio ? 0 : previewDesignWidthPx * (dimensions.height / dimensions.width);
   const template = templates[templateId];
@@ -352,6 +447,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("rednote.ratio.v2", ratio);
   }, [ratio]);
+
+  useEffect(() => {
+    localStorage.setItem(customSizeStoreKey, JSON.stringify(customSize));
+  }, [customSize]);
 
   useEffect(() => {
     localStorage.setItem("rednote.template.v2", templateId);
@@ -630,6 +729,20 @@ function App() {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [isExportMenuOpen]);
 
+  useEffect(() => {
+    if (!isCustomSizeMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (customSizeControlRef.current?.contains(target)) return;
+      setIsCustomSizeMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isCustomSizeMenuOpen]);
+
   function pushUndoSnapshot(current: string) {
     setUndoStack((items) => [current, ...items].slice(0, 50));
     setRedoStack([]);
@@ -710,6 +823,7 @@ function App() {
     setIsTemplatePickerOpen(false);
     setIsMobileSettingsOpen(false);
     setIsExportMenuOpen(false);
+    setIsCustomSizeMenuOpen(false);
 
     if (nextMode === "preview") {
       updateActiveBlockFromEditorSelection({ scroll: false });
@@ -1169,6 +1283,7 @@ function App() {
       setIsTemplatePickerOpen(false);
       setIsMobileSettingsOpen(false);
       setIsExportMenuOpen(false);
+      setIsCustomSizeMenuOpen(false);
     });
 
     await new Promise<void>((resolve) => {
@@ -1263,12 +1378,54 @@ function App() {
           <span>Rednote Markdown Studio</span>
         </div>
         <div className="topbar-actions">
-          <select className="desktop-topbar-control" value={ratio} onChange={(event) => setRatio(event.target.value as RatioId)} aria-label="选择导出画布比例">
+          <select
+            className="desktop-topbar-control"
+            value={ratio}
+            onChange={(event) => {
+              const nextRatio = event.target.value as RatioId;
+              setRatio(nextRatio);
+              setIsCustomSizeMenuOpen(nextRatio === "custom");
+              setIsTemplatePickerOpen(false);
+              setIsMobileSettingsOpen(false);
+              setIsExportMenuOpen(false);
+            }}
+            aria-label="选择导出画布比例"
+          >
             <option value="9:16">9:16 · 1080×1920</option>
             <option value="3:4">3:4 · 1080×1440</option>
             <option value="1:1">1:1 · 1080×1080</option>
+            <option value="custom">自定义 · {formatDimensions(customSize)}</option>
             <option value="full">全文长图 · 1080×自适应</option>
           </select>
+          {ratio === "custom" && (
+            <div className="custom-size-control desktop-custom-size-control" ref={customSizeControlRef}>
+              <button
+                className="desktop-topbar-control custom-size-button"
+                type="button"
+                onClick={() => {
+                  setIsCustomSizeMenuOpen((open) => !open);
+                  setIsTemplatePickerOpen(false);
+                  setIsMobileSettingsOpen(false);
+                  setIsExportMenuOpen(false);
+                }}
+                aria-haspopup="dialog"
+                aria-expanded={isCustomSizeMenuOpen}
+                aria-label={`设置自定义尺寸，当前 ${formatDimensions(customSize)}`}
+              >
+                {formatDimensions(customSize)}
+              </button>
+              {isCustomSizeMenuOpen && (
+                <CustomSizePanel
+                  size={customSize}
+                  onSave={(nextSize) => {
+                    setCustomSize(nextSize);
+                    setRatio("custom");
+                    setIsCustomSizeMenuOpen(false);
+                  }}
+                />
+              )}
+            </div>
+          )}
           <button className="desktop-topbar-control" type="button" onClick={resetToTemplateContent} title="恢复当前模板的默认内容模板">
             <RotateCcw size={15} />
             恢复模板内容
@@ -1281,6 +1438,7 @@ function App() {
                 setIsTemplatePickerOpen((open) => !open);
                 setIsMobileSettingsOpen(false);
                 setIsExportMenuOpen(false);
+                setIsCustomSizeMenuOpen(false);
               }}
               aria-haspopup="dialog"
               aria-expanded={isTemplatePickerOpen}
@@ -1322,6 +1480,7 @@ function App() {
               setIsMobileSettingsOpen((open) => !open);
               setIsTemplatePickerOpen(false);
               setIsExportMenuOpen(false);
+              setIsCustomSizeMenuOpen(false);
             }}
             aria-expanded={isMobileSettingsOpen}
             aria-haspopup="dialog"
@@ -1340,6 +1499,7 @@ function App() {
                     ["9:16", "9:16"],
                     ["3:4", "3:4"],
                     ["1:1", "1:1"],
+                    ["custom", "自定义"],
                     ["full", "长图"]
                   ] as const).map(([value, label]) => (
                     <button
@@ -1354,6 +1514,17 @@ function App() {
                   ))}
                 </div>
               </div>
+
+              {ratio === "custom" && (
+                <CustomSizePanel
+                  size={customSize}
+                  variant="mobile"
+                  onSave={(nextSize) => {
+                    setCustomSize(nextSize);
+                    setRatio("custom");
+                  }}
+                />
+              )}
 
               <div className="mobile-setting-stepper" role="group" aria-label="预览字号">
                 <span>字号</span>
@@ -1464,6 +1635,7 @@ function App() {
                   setIsExportMenuOpen((open) => !open);
                   setIsTemplatePickerOpen(false);
                   setIsMobileSettingsOpen(false);
+                  setIsCustomSizeMenuOpen(false);
                 }}
                 disabled={busy === "export"}
                 title="导出"
@@ -1489,6 +1661,7 @@ function App() {
                 setIsExportMenuOpen((open) => !open);
                 setIsTemplatePickerOpen(false);
                 setIsMobileSettingsOpen(false);
+                setIsCustomSizeMenuOpen(false);
               }}
               disabled={busy === "export"}
               title={busy === "export" ? "导出中" : "导出"}
@@ -2541,6 +2714,72 @@ function ImageOptionsPanel({
         onChange={(size) => onChange({ size })}
       />
     </div>
+  );
+}
+
+function CustomSizePanel({
+  size,
+  variant = "desktop",
+  onSave
+}: {
+  size: CanvasDimensions;
+  variant?: "desktop" | "mobile";
+  onSave: (size: CanvasDimensions) => void;
+}) {
+  const [widthText, setWidthText] = useState(String(size.width));
+  const [heightText, setHeightText] = useState(String(size.height));
+
+  useEffect(() => {
+    setWidthText(String(size.width));
+    setHeightText(String(size.height));
+  }, [size.width, size.height]);
+
+  const draft = getCustomSizeDraft(widthText, heightText);
+  const hasChanges = draft.size != null && (draft.size.width !== size.width || draft.size.height !== size.height);
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft.size) return;
+    onSave(draft.size);
+  }
+
+  return (
+    <form className={`custom-size-panel custom-size-panel-${variant}`} onSubmit={handleSubmit} aria-label="自定义画布尺寸">
+      <div className="custom-size-grid">
+        <label>
+          <span>宽度</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={customSizeLimits.minWidth}
+            max={customSizeLimits.maxWidth}
+            step={1}
+            value={widthText}
+            onChange={(event) => setWidthText(event.target.value)}
+            aria-label="自定义画布宽度"
+          />
+        </label>
+        <label>
+          <span>高度</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={customSizeLimits.minHeight}
+            max={customSizeLimits.maxHeight}
+            step={1}
+            value={heightText}
+            onChange={(event) => setHeightText(event.target.value)}
+            aria-label="自定义画布高度"
+          />
+        </label>
+      </div>
+      <p className={draft.error ? "custom-size-note is-error" : "custom-size-note"}>
+        {draft.error || `当前 ${formatDimensions(draft.size ?? size)}，高度/宽度 ${((draft.size ?? size).height / (draft.size ?? size).width).toFixed(2)}`}
+      </p>
+      <button type="submit" className="custom-size-save" disabled={!draft.size || !hasChanges}>
+        保存尺寸
+      </button>
+    </form>
   );
 }
 

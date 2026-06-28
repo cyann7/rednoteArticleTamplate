@@ -2,7 +2,7 @@ export const DEFAULT_TEMPLATE_ID = "apple-modern" as const;
 
 export type TemplateId = string;
 
-export type RatioId = "9:16" | "3:4" | "1:1" | "full";
+export type RatioId = "9:16" | "3:4" | "1:1" | "custom" | "full";
 
 export type PageNumberPosition = "top-left" | "top-right" | "middle-right" | "bottom-left" | "bottom-right";
 
